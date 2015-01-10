@@ -1,0 +1,6 @@
+name: TTT
+main: net.mcshockwave.ttt.TroubleInTerroristTown
+version: 2.0
+author: Blaxcraft
+commands:
+   ttt:
