@@ -1,42 +1,57 @@
 package net.mcshockwave.ttt;
 
 import net.mcshockwave.MCS.SQLTable;
+import net.mcshockwave.ttt.manage.FileElements;
 import net.mcshockwave.ttt.manage.Unpackager;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.World.Environment;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 public enum GameWorlds {
 
-	Lobby,
-	Game;
+	Lobby;
 
 	public World	w;
 
 	private GameWorlds() {
-		generate();
+		w = generate(name());
 	}
 
-	public void generate() {
-		WorldCreator wc = new WorldCreator(name()).generateStructures(false).environment(Environment.NORMAL)
+	public static World generate(String name) {
+		WorldCreator wc = new WorldCreator(name).generateStructures(false).environment(Environment.NORMAL)
 				.type(WorldType.FLAT);
-		w = Bukkit.createWorld(wc);
-		w.setSpawnLocation(0, 100, 0);
+		World ret = Bukkit.createWorld(wc);
+		if (FileElements.has("TTT-spawnpoint", ret)) {
+			Location l = FileElements.getLoc("TTT-spawnpoint", ret);
+			ret.setSpawnLocation(l.getBlockX(), l.getBlockY(), l.getBlockZ());
+		} else
+			ret.setSpawnLocation(0, 100, 0);
 
-		if (name().equals("Lobby")) {
-			generateLobby(w);
+		if (name.equals("Lobby")) {
+			generateLobby(ret);
 		}
+
+		return ret;
 	}
 
 	public static void init() {
@@ -81,6 +96,122 @@ public enum GameWorlds {
 			GameMap gm = new GameMap(SQLTable.TTTMaps.get("World", s, "Name"), s, SQLTable.TTTMaps.get("World", s,
 					"Author"));
 			mapList.add(gm);
+		}
+	}
+
+	public static World getGameWorld() {
+		for (World w : Bukkit.getWorlds()) {
+			boolean isGW = true;
+			try {
+				valueOf(w.getName());
+			} catch (Throwable t) {
+				isGW = false;
+			}
+			if (!isGW && w.getEnvironment() == Environment.NORMAL) {
+				return w;
+			}
+		}
+		return null;
+	}
+
+	public static World addWorld(String map) {
+		World w = getGameWorld();
+		if (w != null) {
+			deleteWorld(getGameWorld());
+		}
+
+		for (int i = 0; i < 3; i++) { // idk maybe this will prevent errors
+			copyWorld("Maps" + File.separator + map, map);
+		}
+		return generate(map);
+	}
+
+	public static void deleteWorld(final String w) {
+		if (Bukkit.getWorld(w) != null) {
+			World wld = Bukkit.getWorld(w);
+			for (Entity e : wld.getEntities()) {
+				if (e instanceof Player) {
+					e.teleport(Lobby.w.getSpawnLocation());
+				} else {
+					e.remove();
+				}
+			}
+			for (Chunk c : wld.getLoadedChunks()) {
+				c.unload(false, false);
+			}
+			if (Bukkit.unloadWorld(w, false)) {
+				System.out.println("Unloaded world");
+			} else {
+				System.err.println("UNLOADING WORLD FAILED");
+			}
+		}
+		Bukkit.getScheduler().runTaskLater(TroubleInTerroristTown.ins, new Runnable() {
+			public void run() {
+				if (delete(new File(w))) {
+					System.out.println("Deleted world!");
+				} else {
+					System.err.println("DELETING WORLD FAILED");
+				}
+			}
+		}, 20l);
+	}
+
+	public static void deleteWorld(World w) {
+		deleteWorld(w.getName());
+	}
+
+	public static boolean delete(File file) {
+		if (file.isDirectory())
+			for (File subfile : file.listFiles())
+				if (!delete(subfile))
+					return false;
+		if (!file.delete())
+			return false;
+		return true;
+	}
+
+	public static void copyWorld(String s, String t) {
+		File source = new File(s);
+		File target = new File(t);
+		try {
+			copyTo(source, target);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void copyTo(File src, File dest) throws IOException {
+		if (src.isDirectory()) {
+
+			if (!dest.exists()) {
+				dest.mkdir();
+			}
+
+			String files[] = src.list();
+
+			for (String file : files) {
+				File srcFile = new File(src, file);
+				File destFile = new File(dest, file);
+				copyTo(srcFile, destFile);
+			}
+
+		} else {
+			if (src.getName().equalsIgnoreCase("uid.dat")) {
+				return;
+			}
+
+			InputStream in = new FileInputStream(src);
+			OutputStream out = new FileOutputStream(dest);
+
+			byte[] buffer = new byte[1024];
+
+			int length;
+			while ((length = in.read(buffer)) > 0) {
+				out.write(buffer, 0, length);
+			}
+
+			in.close();
+			out.close();
 		}
 	}
 

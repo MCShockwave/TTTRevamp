@@ -1,6 +1,9 @@
 package net.mcshockwave.ttt.commands;
 
 import net.mcshockwave.MCS.MCShockwave;
+import net.mcshockwave.MCS.SQLTable;
+import net.mcshockwave.MCS.SQLTable.Rank;
+import net.mcshockwave.ttt.GameManager;
 import net.mcshockwave.ttt.GameWorlds;
 import net.mcshockwave.ttt.GameWorlds.GameMap;
 
@@ -16,6 +19,10 @@ public class TTTCommand implements CommandExecutor {
 
 	@Override
 	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+		if (!sender.isOp() && !SQLTable.hasRank(sender.getName(), Rank.JR_MOD)) {
+			return false;
+		}
+		
 		if (args.length < 1) {
 			return false;
 		}
@@ -26,6 +33,11 @@ public class TTTCommand implements CommandExecutor {
 			if (args[0].equalsIgnoreCase("world")) {
 				World w = Bukkit.getWorld(args[1]);
 				p.teleport(w.getSpawnLocation());
+			}
+			if (args[0].equalsIgnoreCase("listWorlds")) {
+				for (World w : Bukkit.getWorlds()) {
+					p.sendMessage(w.getName() + ", env " + w.getEnvironment().name());
+				}
 			}
 			if (args[0].equalsIgnoreCase("updateMap")) {
 				GameWorlds.updateMap(args[1]);
@@ -43,6 +55,14 @@ public class TTTCommand implements CommandExecutor {
 			if (args[0].equalsIgnoreCase("updateMapList")) {
 				GameWorlds.updateMapList();
 				p.sendMessage("§cUpdated maps for all games");
+			}
+			if (args[0].equalsIgnoreCase("loadWorld")) {
+				GameWorlds.addWorld(args[1]);
+				p.sendMessage("§aLoaded map " + args[1]);
+			}
+			
+			if (args[0].equalsIgnoreCase("startcount")) {
+				GameManager.startCount();
 			}
 		}
 
