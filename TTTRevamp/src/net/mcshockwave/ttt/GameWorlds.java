@@ -26,6 +26,7 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public enum GameWorlds {
 
@@ -114,16 +115,18 @@ public enum GameWorlds {
 		return null;
 	}
 
-	public static World addWorld(String map) {
+	public static void addWorld(final String map) {
 		World w = getGameWorld();
 		if (w != null) {
 			deleteWorld(getGameWorld());
 		}
 
-		for (int i = 0; i < 3; i++) { // idk maybe this will prevent errors
-			copyWorld("Maps" + File.separator + map, map);
-		}
-		return generate(map);
+		new BukkitRunnable() {
+			public void run() {
+				copyWorld("Maps" + File.separator + map, map);
+				generate(map);
+			}
+		}.runTaskLater(TroubleInTerroristTown.ins, 40);
 	}
 
 	public static void deleteWorld(final String w) {
@@ -216,13 +219,31 @@ public enum GameWorlds {
 	}
 
 	// TODO temp
-	private static void generateLobby(World w) {
+	public static void generateLobby(World w) {
+		Material[] light = { Material.REDSTONE_LAMP_ON, Material.GLOWSTONE };
+		Material[] accent = { Material.WOOD, Material.NETHER_BRICK, Material.OBSIDIAN, Material.PACKED_ICE,
+				Material.SOUL_SAND };
+		Material[] base = { Material.GRASS, Material.QUARTZ_BLOCK, Material.NETHER_BRICK, Material.SNOW_BLOCK,
+				Material.NETHERRACK };
+
+		Random rand = new Random();
+
+		Material li = light[rand.nextInt(light.length)];
+		int bid = rand.nextInt(accent.length);
+		Material ac = accent[bid];
+		Material ba = base[bid];
+
+		Material wall = Material.GLASS;
+
 		int rad = 35;
 		int yval = 97;
 		for (int x = -rad; x <= rad; x++) {
 			for (int z = -rad; z <= rad; z++) {
 				for (int y = yval; y <= ((Math.abs(x) == rad || Math.abs(z) == rad) ? yval + 6 : yval + 1); y++) {
-					Material m = (x % 5 == 0 && z % 5 == 0 && y == yval + 1) ? Material.GLOWSTONE : Material.BEDROCK;
+					// Code is so messy but it works
+					Material m = (x % 5 == 0 && z % 5 == 0 && y == yval) ? Material.REDSTONE_BLOCK : (x % 5 == 0
+							&& z % 5 == 0 && y == yval + 1) ? li : ((x % 5 == 0 || z % 5 == 0) && y == yval + 1) ? ac
+							: y > yval + 1 ? wall : ba;
 					Block b = w.getBlockAt(x, y, z);
 					if (b.getType() != m) {
 						b.setType(m);

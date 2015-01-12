@@ -71,6 +71,11 @@
 			<artifactId>MCShockwave</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
+		<dependency>
+			<groupId>Guns</groupId>
+			<artifactId>Guns</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
 	</dependencies>
 	<distributionManagement>
 		<repository>

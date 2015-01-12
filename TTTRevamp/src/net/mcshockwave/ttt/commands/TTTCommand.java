@@ -22,7 +22,7 @@ public class TTTCommand implements CommandExecutor {
 		if (!sender.isOp() && !SQLTable.hasRank(sender.getName(), Rank.JR_MOD)) {
 			return false;
 		}
-		
+
 		if (args.length < 1) {
 			return false;
 		}
@@ -60,9 +60,19 @@ public class TTTCommand implements CommandExecutor {
 				GameWorlds.addWorld(args[1]);
 				p.sendMessage("§aLoaded map " + args[1]);
 			}
-			
+
 			if (args[0].equalsIgnoreCase("startcount")) {
 				GameManager.startCount();
+			}
+			if (args[0].equalsIgnoreCase("start")) {
+				GameManager.prepare();
+			}
+			if (args[0].equalsIgnoreCase("stop")) {
+				GameManager.stop(null);
+			}
+
+			if (args[0].equalsIgnoreCase("lobby")) {
+				GameWorlds.generateLobby(GameWorlds.Lobby.w);
 			}
 		}
 

@@ -1,6 +1,7 @@
 name: TTT
 main: net.mcshockwave.ttt.TroubleInTerroristTown
 version: 2.0
+depend: [MCShockwave]
 author: Blaxcraft
 commands:
    ttt:
