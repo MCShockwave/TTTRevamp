@@ -64,11 +64,26 @@ public class FileElements {
 
 		return new Location(w, x, y, z, yaw, pit);
 	}
-	
+
+	public static ArrayList<Location> getAll(String el, World w) {
+		ArrayList<Location> ret = new ArrayList<>();
+
+		int max = 0;
+		while (has(el + "-" + ++max, w)) {
+		}
+		max--;
+
+		for (int i = 1; i <= max; i++) {
+			ret.add(getLoc(el + "-" + i, w));
+		}
+
+		return ret;
+	}
+
 	public static boolean has(String el, World w) {
 		return has(el, w.getName());
 	}
-	
+
 	public static boolean has(String el, String w) {
 		return get(el, w) != null;
 	}

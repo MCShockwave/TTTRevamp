@@ -5,6 +5,7 @@ import net.mcshockwave.MCS.SQLTable;
 import net.mcshockwave.MCS.SQLTable.Rank;
 import net.mcshockwave.ttt.GameManager;
 import net.mcshockwave.ttt.GameWorlds;
+import net.mcshockwave.ttt.GameManager.GameState;
 import net.mcshockwave.ttt.GameWorlds.GameMap;
 
 import org.bukkit.Bukkit;
@@ -73,6 +74,21 @@ public class TTTCommand implements CommandExecutor {
 
 			if (args[0].equalsIgnoreCase("lobby")) {
 				GameWorlds.generateLobby(GameWorlds.Lobby.w);
+			}
+
+			if (args[0].equalsIgnoreCase("exclude")) {
+				String n = args[1];
+				if (GameManager.exclude.contains(n)) {
+					GameManager.exclude.remove(n);
+					p.sendMessage("§cRemoved " + n + " from exclusion list");
+				} else {
+					GameManager.exclude.add(n);
+					p.sendMessage("§aAdded " + n + " to exclusion list");
+					if (GameManager.state == GameState.GAME && Bukkit.getPlayer(n) != null
+							&& GameManager.getPlayers(false).contains(Bukkit.getPlayer(n))) {
+						GameManager.spectate(Bukkit.getPlayer(n), false);
+					}
+				}
 			}
 		}
 

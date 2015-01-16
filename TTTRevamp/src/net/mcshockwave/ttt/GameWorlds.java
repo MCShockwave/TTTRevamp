@@ -1,6 +1,7 @@
 package net.mcshockwave.ttt;
 
 import net.mcshockwave.MCS.SQLTable;
+import net.mcshockwave.MCS.Utils.PacketUtils;
 import net.mcshockwave.ttt.manage.FileElements;
 import net.mcshockwave.ttt.manage.Unpackager;
 
@@ -8,14 +9,19 @@ import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.World.Environment;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -218,37 +224,154 @@ public enum GameWorlds {
 		}
 	}
 
-	// TODO temp
-	public static void generateLobby(World w) {
+	public static BukkitTask	lobbyAnimation	= null;
+	public static Random		rand			= new Random();
+
+	// TODO temp?
+	public static void generateLobby(final World w) {
+		if (rand == null) {
+			rand = new Random();
+		}
+
 		Material[] light = { Material.REDSTONE_LAMP_ON, Material.GLOWSTONE };
 		Material[] accent = { Material.WOOD, Material.NETHER_BRICK, Material.OBSIDIAN, Material.PACKED_ICE,
 				Material.SOUL_SAND };
 		Material[] base = { Material.GRASS, Material.QUARTZ_BLOCK, Material.NETHER_BRICK, Material.SNOW_BLOCK,
 				Material.NETHERRACK };
 
-		Random rand = new Random();
-
-		Material li = light[rand.nextInt(light.length)];
+		final Material li = light[rand.nextInt(light.length)];
 		int bid = rand.nextInt(accent.length);
-		Material ac = accent[bid];
-		Material ba = base[bid];
+		final Material ac = accent[bid];
+		final Material ba = base[bid];
+
+		final int spacing = 5;
 
 		Material wall = Material.GLASS;
 
-		int rad = 35;
-		int yval = 97;
+		final int rad = 35;
+		final int yval = 97;
 		for (int x = -rad; x <= rad; x++) {
 			for (int z = -rad; z <= rad; z++) {
 				for (int y = yval; y <= ((Math.abs(x) == rad || Math.abs(z) == rad) ? yval + 6 : yval + 1); y++) {
 					// Code is so messy but it works
-					Material m = (x % 5 == 0 && z % 5 == 0 && y == yval) ? Material.REDSTONE_BLOCK : (x % 5 == 0
-							&& z % 5 == 0 && y == yval + 1) ? li : ((x % 5 == 0 || z % 5 == 0) && y == yval + 1) ? ac
-							: y > yval + 1 ? wall : ba;
+					Material m = (x % spacing == 0 && z % spacing == 0 && y == yval) ? Material.REDSTONE_BLOCK : (x
+							% spacing == 0
+							&& z % spacing == 0 && y == yval + 1) ? li
+							: ((x % spacing == 0 || z % spacing == 0) && y == yval + 1) ? ac : y > yval + 1 ? wall : ba;
 					Block b = w.getBlockAt(x, y, z);
 					if (b.getType() != m) {
 						b.setType(m);
 					}
 				}
+			}
+		}
+
+		if (lobbyAnimation != null) {
+			lobbyAnimation.cancel();
+		}
+		lobbyAnimation = new BukkitRunnable() {
+			// why did I do this? idk
+			public void run() {
+				if (w.getPlayers().size() == 0) {
+					return;
+				}
+
+				if (rand.nextInt(500) == 0) {
+					int y = yval + 1;
+					for (int x = -rad; x <= rad; x += spacing) {
+						for (int z = -rad; z <= rad; z += spacing) {
+							Block b = w.getBlockAt(x, y, z);
+							if (b.getType() == li) {
+								spawnJumpingBlock(b, rand.nextDouble());
+							}
+						}
+					}
+				}
+
+				if (rand.nextInt(50) == 0) {
+					for (int i = 0; i < rand.nextInt(5) + 5; i++) {
+						int xco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
+						int zco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
+						int y = yval + 1;
+
+						double vel = rand.nextDouble() + 0.5;
+
+						for (int x = 0; x <= spacing; x++) {
+							for (int z = 0; z <= spacing; z++) {
+								Block b = w.getBlockAt(xco + x, y, zco + z);
+								if (b.getType() == ba) {
+									spawnJumpingBlock(b, vel + (rand.nextGaussian() / 100));
+								}
+							}
+						}
+					}
+				}
+
+				if (rand.nextInt(750) == 0) {
+					int xadd = rand.nextBoolean() ? 1 : -1;
+					int zadd = rand.nextBoolean() ? 1 : -1;
+
+					int y = yval + 1;
+
+					int xstart = rad * -xadd;
+					int zstart = rad * -zadd;
+
+					w.playSound(new Location(w, xstart, y, zstart), Sound.FIREWORK_LAUNCH, 1000, 0);
+
+					final double vel = rand.nextDouble() / 5 + 0.2;
+
+					double del = 0;
+					for (int d = 0; d <= rad * 2; d++) {
+						del += 1.5;
+						final ArrayList<Block> change = new ArrayList<>();
+
+						int dx = d * xadd;
+						int dz = d * zadd;
+
+						int xc = xstart + dx;
+						int zc = zstart + dz;
+
+						for (int x = xstart; (xadd < 0 ? x >= xc : x <= xc); x += xadd) {
+							Block b = w.getBlockAt(x, y, zc);
+							if (!change.contains(b)) {
+								change.add(b);
+							}
+						}
+						for (int z = zstart; (zadd < 0 ? z >= zc : z <= zc); z += zadd) {
+							Block b = w.getBlockAt(xc, y, z);
+							if (!change.contains(b)) {
+								change.add(b);
+							}
+						}
+
+						new BukkitRunnable() {
+							public void run() {
+								for (Block b : change) {
+									if (b.getType() == ac && b.getRelative(BlockFace.UP).getType() == Material.AIR) {
+										spawnJumpingBlock(b, vel);
+									}
+								}
+							}
+						}.runTaskLater(TroubleInTerroristTown.ins, (long) del);
+					}
+				}
+			}
+		}.runTaskTimer(TroubleInTerroristTown.ins, 2, 2);
+	}
+
+	private static void spawnJumpingBlock(Block b, double vel) {
+		@SuppressWarnings("deprecation")
+		FallingBlock fb = b.getWorld()
+				.spawnFallingBlock(b.getLocation().clone().add(0, 1, 0), b.getType(), b.getData());
+		fb.setVelocity(new Vector(0, vel + (rand.nextGaussian() / 100), 0));
+		PacketUtils.playBlockParticles(b.getType(), 0, b.getLocation());
+
+		fb.getWorld().playSound(fb.getLocation(), Sound.CHICKEN_EGG_POP, 4, 0);
+		fb.setDropItem(false);
+
+		for (Entity e : fb.getNearbyEntities(3, 3, 3)) {
+			if (e instanceof Player) {
+				e.setVelocity(fb.getVelocity());
 			}
 		}
 	}

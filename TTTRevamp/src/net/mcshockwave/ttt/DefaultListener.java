@@ -1,5 +1,7 @@
 package net.mcshockwave.ttt;
 
+import net.mcshockwave.Guns.Gun;
+import net.mcshockwave.Guns.descriptors.GunType;
 import net.mcshockwave.MCS.MCShockwave;
 import net.mcshockwave.ttt.GameManager.GameState;
 import net.mcshockwave.ttt.manage.FileElements;
@@ -10,19 +12,25 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
@@ -32,8 +40,7 @@ public class DefaultListener implements Listener {
 	public void onPlayerJoin(PlayerJoinEvent event) {
 		Player p = event.getPlayer();
 
-		if (GameManager.state == GameState.IDLE && GameManager.getPlayers().size() >= GameManager.minPlayers
-				&& GameManager.state == GameState.IDLE) {
+		if (GameManager.state == GameState.IDLE && GameManager.getPlayers().size() >= GameManager.minPlayers) {
 			MCShockwave.broadcast("%s has reached minimum player count!", "Game");
 			GameManager.startCount();
 		}
@@ -56,7 +63,8 @@ public class DefaultListener implements Listener {
 			GameManager.onDeath(p, null);
 		}
 
-		if (GameManager.getPlayers().size() <= GameManager.minPlayers && GameManager.state != GameState.IDLE) {
+		if (GameManager.getPlayers().size() <= GameManager.minPlayers && GameManager.state != GameState.IDLE
+				&& (GameManager.state != GameState.GAME || GameManager.getPlayers().size() <= 1)) {
 			if (GameManager.count != null) {
 				GameManager.count.terminate();
 			}
@@ -85,13 +93,19 @@ public class DefaultListener implements Listener {
 		if (ee instanceof Player) {
 			Player p = (Player) ee;
 
+			if (event.getCause() == DamageCause.VOID) {
+				p.teleport(p.getWorld().getSpawnLocation());
+			}
+
 			if (ee.getWorld().getName().equals(GameWorlds.Lobby.name())) {
 				event.setCancelled(true);
 			}
 
-			if (ee.getWorld().getName().equals(GameWorlds.getGameWorld().getName())
-					&& GameManager.state == GameState.PREPARING) {
-				event.setCancelled(true);
+			if (GameWorlds.getGameWorld() != null) {
+				if (ee.getWorld().getName().equals(GameWorlds.getGameWorld().getName())
+						&& GameManager.state == GameState.PREPARING) {
+					event.setCancelled(true);
+				}
 			}
 
 			if (GameManager.specs.contains(p.getName())) {
@@ -121,7 +135,7 @@ public class DefaultListener implements Listener {
 			event.setCancelled(true);
 		}
 	}
-	
+
 	@EventHandler
 	public void onBlockPlace(BlockPlaceEvent event) {
 		if (event.getPlayer().getGameMode() != GameMode.CREATIVE) {
@@ -166,6 +180,53 @@ public class DefaultListener implements Listener {
 				p.setFireTicks(0);
 			}
 		}.runTaskLater(TroubleInTerroristTown.ins, 1);
+	}
+
+	@EventHandler
+	public void onItemPickup(PlayerPickupItemEvent event) {
+		Player p = event.getPlayer();
+		ItemStack it = event.getItem().getItemStack();
+
+		if (GameManager.specs.contains(p.getName())) {
+			event.setCancelled(true);
+		}
+
+		if (p.getItemOnCursor() != null && p.getItemOnCursor().getType() != Material.AIR) {
+			event.setCancelled(true);
+			return;
+		}
+
+		if (Gun.fromItem(it) != null) {
+			Gun g = Gun.fromItem(it);
+			for (ItemStack con : p.getInventory().getContents()) {
+				if (con != null && con.getType() != Material.AIR && Gun.fromItem(con) != null) {
+					Gun cg = Gun.fromItem(con);
+					if (g.type == GunType.PISTOL && cg.type == GunType.PISTOL) {
+						event.setCancelled(true);
+					} else if (g.type != GunType.PISTOL && cg.type != GunType.PISTOL) {
+						event.setCancelled(true);
+					}
+				}
+			}
+		}
+
+		if (!event.isCancelled() && event.getItem().getLocation().getBlock().getType().name().contains("_PLATE")) {
+			event.getItem().getLocation().getBlock().setType(Material.AIR);
+		}
+	}
+
+	@EventHandler
+	public void onEntityChangeBlock(EntityChangeBlockEvent event) {
+		if (event.getEntityType() == EntityType.FALLING_BLOCK) {
+			event.setCancelled(true);
+		}
+	}
+
+	@EventHandler
+	public void onItemDespawn(ItemDespawnEvent event) {
+		if (event.getEntity().getLocation().getBlock().getType() == Material.STONE_PLATE) {
+			event.setCancelled(true);
+		}
 	}
 
 	@EventHandler

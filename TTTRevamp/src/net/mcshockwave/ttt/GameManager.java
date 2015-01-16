@@ -1,7 +1,7 @@
 package net.mcshockwave.ttt;
 
-import net.mcshockwave.Guns.addons.Addon;
-import net.mcshockwave.Guns.descriptors.Category;
+import net.mcshockwave.Guns.Gun;
+import net.mcshockwave.Guns.descriptors.AmmoType;
 import net.mcshockwave.MCS.MCShockwave;
 import net.mcshockwave.MCS.Utils.ItemMetaUtils;
 import net.mcshockwave.MCS.Utils.SchedulerUtils;
@@ -11,9 +11,11 @@ import net.mcshockwave.ttt.utils.PlayerUtils;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.inventory.ItemStack;
@@ -25,15 +27,18 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.Random;
 
 public class GameManager {
 
-	public static final int	minPlayers	= 4;
+	public static final int			minPlayers	= 4;
 
-	public static Random	rand		= new Random();
+	public static Random			rand		= new Random();
+
+	public static ArrayList<String>	exclude		= new ArrayList<>();
 
 	public static void enable() {
 		GameWorlds.init();
@@ -181,20 +186,45 @@ public class GameManager {
 	public static void basicKit(Player p) {
 		PlayerUtils.clearInv(p);
 		p.getInventory().setItem(0, ItemMetaUtils.setItemName(new ItemStack(Material.IRON_SWORD), "§fCrowbar"));
-		p.getInventory().addItem(
-				Addon.Infinite_Ammo.add(Category.TTT.getGuns()[rand.nextInt(Category.TTT.getGuns().length)].getItem()));
+		p.getInventory().setItem(7, AmmoType.TTT_PRIMARY.getItem(20));
+		p.getInventory().setItem(8, AmmoType.TTT_SECONDARY.getItem(10));
 	}
+
+	public static final Gun[]		validSpawns	= { Gun.TTT_AK47, Gun.TTT_DEAGLE, Gun.TTT_GLOCK, Gun.TTT_HUGE,
+			Gun.TTT_M16, Gun.TTT_MAC10, Gun.TTT_RIFLE, Gun.TTT_SHOTGUN };
+	public static final AmmoType[]	validAmmo	= { AmmoType.TTT_PRIMARY, AmmoType.TTT_SECONDARY };
 
 	public static void prepare() {
 		state = GameState.PREPARING;
 
 		MCShockwave.broadcast("Game %s!", "started");
 		MCShockwave.broadcast(ChatColor.GRAY, "%s", "Preparing...");
+		ArrayList<Location> spawns = FileElements.getAll("player-spawn", GameWorlds.getGameWorld());
 
 		for (Player p : getPlayers()) {
-			p.teleport(GameWorlds.getGameWorld().getSpawnLocation());
+			p.teleport(spawns.get(rand.nextInt(spawns.size())).clone().add(0, 1, 0));
 			registerScoreboards();
 			basicKit(p);
+		}
+
+		ArrayList<Location> guns = FileElements.getAll("gun-spawn", GameWorlds.getGameWorld());
+		for (final Location l : guns) {
+			l.add(0.5, 1.5, 0.5);
+			ItemStack it;
+			if (rand.nextInt(2) != 0) {
+				l.getBlock().setType(Material.STONE_PLATE);
+				it = validSpawns[rand.nextInt(validSpawns.length)].getItem();
+			} else {
+				l.getBlock().setType(Material.WOOD_PLATE);
+				it = validAmmo[rand.nextInt(validAmmo.length)].getItem(rand.nextInt(16) + 8);
+			}
+			final Item i = l.getWorld().dropItem(l, it);
+			i.setVelocity(new Vector());
+			new BukkitRunnable() {
+				public void run() {
+					i.teleport(l);
+				}
+			}.runTaskLater(TroubleInTerroristTown.ins, 10);
 		}
 
 		count = SchedulerUtils.getNew();
@@ -244,6 +274,11 @@ public class GameManager {
 		ArrayList<Player> ret = new ArrayList<>();
 
 		ret.addAll(Bukkit.getOnlinePlayers());
+		for (String s : exclude) {
+			if (Bukkit.getPlayer(s) != null) {
+				ret.remove(Bukkit.getPlayer(s));
+			}
+		}
 
 		return ret;
 	}
@@ -300,7 +335,9 @@ public class GameManager {
 					r.players.clear();
 					r.all.clear();
 				}
-				state = GameState.LOBBY;
+				if (state != GameState.IDLE) {
+					state = GameState.LOBBY;
+				}
 			}
 		});
 		count.add(20);
