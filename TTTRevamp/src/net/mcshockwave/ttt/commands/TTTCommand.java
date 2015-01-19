@@ -7,9 +7,11 @@ import net.mcshockwave.ttt.GameManager;
 import net.mcshockwave.ttt.GameWorlds;
 import net.mcshockwave.ttt.GameManager.GameState;
 import net.mcshockwave.ttt.GameWorlds.GameMap;
+import net.mcshockwave.ttt.utils.ParkourManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -89,6 +91,11 @@ public class TTTCommand implements CommandExecutor {
 						GameManager.spectate(Bukkit.getPlayer(n), false);
 					}
 				}
+			}
+
+			if (args[0].equalsIgnoreCase("parkour")) {
+				ParkourManager.generateNew(p, args.length > 1 ? Material.valueOf(args[1].toUpperCase())
+						: Material.QUARTZ_BLOCK);
 			}
 		}
 

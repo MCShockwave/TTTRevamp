@@ -7,6 +7,9 @@ import net.mcshockwave.MCS.Utils.ItemMetaUtils;
 import net.mcshockwave.MCS.Utils.SchedulerUtils;
 import net.mcshockwave.ttt.GameWorlds.GameMap;
 import net.mcshockwave.ttt.manage.FileElements;
+import net.mcshockwave.ttt.shop.DetectiveShop;
+import net.mcshockwave.ttt.shop.ShopManager;
+import net.mcshockwave.ttt.shop.TraitorShop;
 import net.mcshockwave.ttt.utils.PlayerUtils;
 
 import org.bukkit.Bukkit;
@@ -30,6 +33,7 @@ import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Random;
 
 public class GameManager {
@@ -190,9 +194,14 @@ public class GameManager {
 		p.getInventory().setItem(8, AmmoType.TTT_SECONDARY.getItem(10));
 	}
 
-	public static final Gun[]		validSpawns	= { Gun.TTT_AK47, Gun.TTT_DEAGLE, Gun.TTT_GLOCK, Gun.TTT_HUGE,
+	public static final Gun[]		validSpawns		= { Gun.TTT_AK47, Gun.TTT_DEAGLE, Gun.TTT_GLOCK, Gun.TTT_HUGE,
 			Gun.TTT_M16, Gun.TTT_MAC10, Gun.TTT_RIFLE, Gun.TTT_SHOTGUN };
-	public static final AmmoType[]	validAmmo	= { AmmoType.TTT_PRIMARY, AmmoType.TTT_SECONDARY };
+	public static final AmmoType[]	validAmmo		= { AmmoType.TTT_PRIMARY, AmmoType.TTT_PRIMARY,
+			AmmoType.TTT_SECONDARY					};
+	public static final ItemStack[]	validGrenades	= {
+			ItemMetaUtils.setItemName(new ItemStack(Material.EGG), "§fIncendiary Grenade"),
+			ItemMetaUtils.setItemName(new ItemStack(Material.SNOW_BALL), "§fSmoke Grenade"),
+			ItemMetaUtils.setItemName(new ItemStack(Material.ENDER_PEARL), "§fDiscombobulator") };
 
 	public static void prepare() {
 		state = GameState.PREPARING;
@@ -211,12 +220,16 @@ public class GameManager {
 		for (final Location l : guns) {
 			l.add(0.5, 1.5, 0.5);
 			ItemStack it;
-			if (rand.nextInt(2) != 0) {
+			int r = rand.nextInt(5);
+			if (r == 0 || r == 1) {
 				l.getBlock().setType(Material.STONE_PLATE);
 				it = validSpawns[rand.nextInt(validSpawns.length)].getItem();
-			} else {
+			} else if (r == 2 || r == 3) {
 				l.getBlock().setType(Material.WOOD_PLATE);
 				it = validAmmo[rand.nextInt(validAmmo.length)].getItem(rand.nextInt(16) + 8);
+			} else {
+				l.getBlock().setType(Material.IRON_PLATE);
+				it = validGrenades[rand.nextInt(validGrenades.length)].clone();
 			}
 			final Item i = l.getWorld().dropItem(l, it);
 			i.setVelocity(new Vector());
@@ -253,9 +266,18 @@ public class GameManager {
 
 		Role.generate();
 
+		updatePlayerLists();
+
 		for (Role r : Role.values()) {
 			for (Player p : r.getPlayers()) {
 				MCShockwave.send(r.color, p, "You are a" + (isVowel(r.name().charAt(0)) ? "n" : "") + " %s!", r.name());
+
+				if (r != Role.Innocent) {
+					p.getInventory().setItem(17,
+							ItemMetaUtils.setItemName(new ItemStack(Material.GOLD_INGOT), "§6§lOpen Shop"));
+
+					ShopManager.setCredits(p.getName(), 2);
+				}
 			}
 		}
 
@@ -302,6 +324,7 @@ public class GameManager {
 		state = GameState.END;
 
 		specs.clear();
+		innoSlay.clear();
 
 		MCShockwave.broadcast("Game %s!", "ended");
 		if (Role.Traitor.all.size() > 0) {
@@ -313,6 +336,18 @@ public class GameManager {
 			ts = ts.substring(0, ts.length() - 2);
 			MCShockwave.broadcast(ChatColor.RED, "The traitor" + (si == 1 ? " was" : "s were") + " " + ts,
 					Role.Traitor.all.toArray(new Object[0]));
+		}
+
+		DefaultListener.healerHealth.clear();
+		DefaultListener.teleporter.clear();
+
+		ShopManager.credits.clear();
+
+		for (TraitorShop ts : TraitorShop.values()) {
+			ts.timesBought.clear();
+		}
+		for (DetectiveShop ds : DetectiveShop.values()) {
+			ds.timesBought.clear();
 		}
 
 		GameWorlds.generateLobby(GameWorlds.Lobby.w);
@@ -343,8 +378,13 @@ public class GameManager {
 		count.add(20);
 		count.add(new Runnable() {
 			public void run() {
-				if (winner != null && getPlayers().size() >= minPlayers) {
-					startCount();
+				if (winner != null) {
+					if (getPlayers().size() >= minPlayers) {
+						startCount();
+					} else {
+						MCShockwave.broadcast("Not enough %s!", "players");
+						state = GameState.IDLE;
+					}
 				}
 			}
 		});
@@ -354,7 +394,9 @@ public class GameManager {
 	public static ArrayList<String>	specs	= new ArrayList<>();
 
 	public static void spectate(Player p, boolean hide) {
-		specs.add(p.getName());
+		if (!specs.contains(p.getName())) {
+			specs.add(p.getName());
+		}
 
 		PlayerUtils.resetPlayer(p);
 
@@ -368,6 +410,10 @@ public class GameManager {
 		p.setAllowFlight(true);
 	}
 
+	public static final int					innocentSlayLimit	= 3;
+
+	public static HashMap<String, Integer>	innoSlay			= new HashMap<>();
+
 	public static void onDeath(Player p, PlayerDeathEvent event) {
 		Role r = Role.getRole(p);
 
@@ -375,8 +421,38 @@ public class GameManager {
 			r.players.remove(p.getName());
 
 			if (p.getKiller() != null && Role.getRole(p.getKiller()) != null) {
-				MCShockwave.send(Role.getRole(p.getKiller()).color, p, "Person who killed you was a %s!",
-						Role.getRole(p.getKiller()).name());
+				Role kr = Role.getRole(p.getKiller());
+				MCShockwave.send(kr.color, p, "Person who killed you was a %s!", kr.name());
+
+				if (kr != r) {
+					if (kr == Role.Detective && r == Role.Traitor) {
+						ShopManager.addCredits(p.getKiller().getName(), 2);
+						MCShockwave.send(p.getKiller(), "+%s credits for killing %s", 2, p.getName());
+					}
+					if (kr == Role.Traitor && r != Role.Traitor) {
+						ShopManager.addCredits(p.getKiller().getName(), 1);
+						MCShockwave.send(p.getKiller(), "+%s credit for killing %s", 1, p.getName());
+					}
+				}
+
+				if (kr != Role.Traitor && r != Role.Traitor) {
+					int tb = 0;
+					if (innoSlay.containsKey(p.getKiller().getName())) {
+						tb = innoSlay.get(p.getKiller().getName());
+						innoSlay.remove(p.getKiller().getName());
+					}
+					tb++;
+					if (tb >= innocentSlayLimit) {
+						p.getKiller().damage(p.getMaxHealth() * 10);
+						p.getKiller().sendMessage(
+								"§cYou were slain for having " + innocentSlayLimit + " innocent kills");
+					} else {
+						innoSlay.put(p.getKiller().getName(), tb);
+						p.getKiller().sendMessage(
+								"§aYou killed an innocent! If you kill " + (innocentSlayLimit - tb)
+										+ " more, you will be slain!");
+					}
+				}
 			}
 
 			MCShockwave.broadcast(r.color, "%s was a" + (isVowel(r.name().charAt(0)) ? "n" : "") + " %s!", p.getName(),
@@ -386,14 +462,57 @@ public class GameManager {
 		if (state == GameState.GAME) {
 			if (Role.Traitor.getPlayers().size() == 0) {
 				MCShockwave.broadcast(Role.Innocent.color, "%s win!", "Innocents");
-				stop(null);
+				stop("Innocents");
 			} else if (Role.Detective.getPlayers().size() == 0 && Role.Innocent.getPlayers().size() == 0) {
 				MCShockwave.broadcast(Role.Traitor.color, "%s win!", "Traitors");
-				stop(null);
+				stop("Traitors");
 			}
 		}
 
 		updateScoreboards();
+		updatePlayerLists();
+	}
+
+	public static void updatePlayerLists() {
+		for (Player p : getPlayers(true)) {
+			updatePlayerList(p);
+		}
+	}
+
+	public static void updatePlayerList(Player p) {
+		ArrayList<String> lo = new ArrayList<>();
+
+		lo.add("§a§nAlive");
+		for (Player a : getPlayers(false)) {
+			lo.add((Role.getRole(a) == Role.Detective ? "§9" : Role.getRole(a) == Role.Traitor
+					&& Role.getRole(p) == Role.Traitor ? "§c" : "")
+					+ a.getName());
+		}
+		lo.add("§4§nConfirmed Dead");
+		for (String s : specs) {
+			if (Bukkit.getPlayer(s) != null) {
+				Player sp = Bukkit.getPlayer(s);
+				if (Role.getPastRole(sp) != null) {
+					lo.add(Role.getPastRole(sp).color + sp.getName());
+				}
+			}
+		}
+		lo.add("§d§nSpectators");
+		for (String s : specs) {
+			if (Role.getPastRole(s) == null && Bukkit.getPlayer(s) != null) {
+				lo.add(s);
+			}
+		}
+
+		ItemStack set = new ItemStack(Material.PAPER);
+		ItemMetaUtils.setItemName(set, "§6§lPlayer List");
+		String[] lore = new String[lo.size()];
+		for (int i = 0; i < lore.length; i++) {
+			lore[i] = "§7" + lo.get(i);
+		}
+		ItemMetaUtils.setLore(set, lore);
+
+		p.getInventory().setItem(9, set);
 	}
 
 	public static GameState	state	= GameState.IDLE;

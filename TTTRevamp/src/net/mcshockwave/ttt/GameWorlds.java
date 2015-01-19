@@ -16,6 +16,7 @@ import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.Sign;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
@@ -235,9 +236,9 @@ public enum GameWorlds {
 
 		Material[] light = { Material.REDSTONE_LAMP_ON, Material.GLOWSTONE };
 		Material[] accent = { Material.WOOD, Material.NETHER_BRICK, Material.OBSIDIAN, Material.PACKED_ICE,
-				Material.SOUL_SAND };
+				Material.SMOOTH_BRICK };
 		Material[] base = { Material.GRASS, Material.QUARTZ_BLOCK, Material.NETHER_BRICK, Material.SNOW_BLOCK,
-				Material.NETHERRACK };
+				Material.STONE };
 
 		final Material li = light[rand.nextInt(light.length)];
 		int bid = rand.nextInt(accent.length);
@@ -266,100 +267,113 @@ public enum GameWorlds {
 			}
 		}
 
-		if (lobbyAnimation != null) {
-			lobbyAnimation.cancel();
-		}
-		lobbyAnimation = new BukkitRunnable() {
-			// why did I do this? idk
-			public void run() {
-				if (w.getPlayers().size() == 0) {
-					return;
-				}
+		Block psign = w.getBlockAt(0, yval + 3, rad - 1);
+		psign.setType(Material.WALL_SIGN);
+		org.bukkit.material.Sign data = (org.bukkit.material.Sign) psign.getState().getData();
+		data.setFacingDirection(BlockFace.NORTH);
 
-				if (rand.nextInt(500) == 0) {
-					int y = yval + 1;
-					for (int x = -rad; x <= rad; x += spacing) {
-						for (int z = -rad; z <= rad; z += spacing) {
-							Block b = w.getBlockAt(x, y, z);
-							if (b.getType() == li) {
-								spawnJumpingBlock(b, rand.nextDouble());
-							}
-						}
-					}
-				}
+		Sign s = (Sign) psign.getState();
+		s.setLine(0, "[Parkour]");
+		s.setLine(2, "Click to go");
+		s.setLine(3, "to parkour");
+		s.update();
 
-				if (rand.nextInt(50) == 0) {
-					for (int i = 0; i < rand.nextInt(5) + 5; i++) {
-						int xco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
-						int zco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
-						int y = yval + 1;
-
-						double vel = rand.nextDouble() + 0.5;
-
-						for (int x = 0; x <= spacing; x++) {
-							for (int z = 0; z <= spacing; z++) {
-								Block b = w.getBlockAt(xco + x, y, zco + z);
-								if (b.getType() == ba) {
-									spawnJumpingBlock(b, vel + (rand.nextGaussian() / 100));
-								}
-							}
-						}
-					}
-				}
-
-				if (rand.nextInt(750) == 0) {
-					int xadd = rand.nextBoolean() ? 1 : -1;
-					int zadd = rand.nextBoolean() ? 1 : -1;
-
-					int y = yval + 1;
-
-					int xstart = rad * -xadd;
-					int zstart = rad * -zadd;
-
-					w.playSound(new Location(w, xstart, y, zstart), Sound.FIREWORK_LAUNCH, 1000, 0);
-
-					final double vel = rand.nextDouble() / 5 + 0.2;
-
-					double del = 0;
-					for (int d = 0; d <= rad * 2; d++) {
-						del += 1.5;
-						final ArrayList<Block> change = new ArrayList<>();
-
-						int dx = d * xadd;
-						int dz = d * zadd;
-
-						int xc = xstart + dx;
-						int zc = zstart + dz;
-
-						for (int x = xstart; (xadd < 0 ? x >= xc : x <= xc); x += xadd) {
-							Block b = w.getBlockAt(x, y, zc);
-							if (!change.contains(b)) {
-								change.add(b);
-							}
-						}
-						for (int z = zstart; (zadd < 0 ? z >= zc : z <= zc); z += zadd) {
-							Block b = w.getBlockAt(xc, y, z);
-							if (!change.contains(b)) {
-								change.add(b);
-							}
-						}
-
-						new BukkitRunnable() {
-							public void run() {
-								for (Block b : change) {
-									if (b.getType() == ac && b.getRelative(BlockFace.UP).getType() == Material.AIR) {
-										spawnJumpingBlock(b, vel);
-									}
-								}
-							}
-						}.runTaskLater(TroubleInTerroristTown.ins, (long) del);
-					}
-				}
-			}
-		}.runTaskTimer(TroubleInTerroristTown.ins, 2, 2);
+		// if (lobbyAnimation != null) {
+		// lobbyAnimation.cancel();
+		// }
+		// lobbyAnimation = new BukkitRunnable() {
+		// // why did I do this? idk
+		// public void run() {
+		// if (w.getPlayers().size() == 0) {
+		// return;
+		// }
+		//
+		// if (rand.nextInt(500) == 0) {
+		// int y = yval + 1;
+		// for (int x = -rad; x <= rad; x += spacing) {
+		// for (int z = -rad; z <= rad; z += spacing) {
+		// Block b = w.getBlockAt(x, y, z);
+		// if (b.getType() == li) {
+		// spawnJumpingBlock(b, rand.nextDouble());
+		// }
+		// }
+		// }
+		// }
+		//
+		// if (rand.nextInt(50) == 0) {
+		// for (int i = 0; i < rand.nextInt(5) + 5; i++) {
+		// int xco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
+		// int zco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
+		// int y = yval + 1;
+		//
+		// double vel = rand.nextDouble() + 0.5;
+		//
+		// for (int x = 0; x <= spacing; x++) {
+		// for (int z = 0; z <= spacing; z++) {
+		// Block b = w.getBlockAt(xco + x, y, zco + z);
+		// if (b.getType() == ba) {
+		// spawnJumpingBlock(b, vel + (rand.nextGaussian() / 100));
+		// }
+		// }
+		// }
+		// }
+		// }
+		//
+		// if (rand.nextInt(750) == 0) {
+		// int xadd = rand.nextBoolean() ? 1 : -1;
+		// int zadd = rand.nextBoolean() ? 1 : -1;
+		//
+		// int y = yval + 1;
+		//
+		// int xstart = rad * -xadd;
+		// int zstart = rad * -zadd;
+		//
+		// w.playSound(new Location(w, xstart, y, zstart),
+		// Sound.FIREWORK_LAUNCH, 1000, 0);
+		//
+		// final double vel = rand.nextDouble() / 5 + 0.2;
+		//
+		// double del = 0;
+		// for (int d = 0; d <= rad * 2; d++) {
+		// del += 1.5;
+		// final ArrayList<Block> change = new ArrayList<>();
+		//
+		// int dx = d * xadd;
+		// int dz = d * zadd;
+		//
+		// int xc = xstart + dx;
+		// int zc = zstart + dz;
+		//
+		// for (int x = xstart; (xadd < 0 ? x >= xc : x <= xc); x += xadd) {
+		// Block b = w.getBlockAt(x, y, zc);
+		// if (!change.contains(b)) {
+		// change.add(b);
+		// }
+		// }
+		// for (int z = zstart; (zadd < 0 ? z >= zc : z <= zc); z += zadd) {
+		// Block b = w.getBlockAt(xc, y, z);
+		// if (!change.contains(b)) {
+		// change.add(b);
+		// }
+		// }
+		//
+		// new BukkitRunnable() {
+		// public void run() {
+		// for (Block b : change) {
+		// if (b.getType() == ac && b.getRelative(BlockFace.UP).getType() ==
+		// Material.AIR) {
+		// spawnJumpingBlock(b, vel);
+		// }
+		// }
+		// }
+		// }.runTaskLater(TroubleInTerroristTown.ins, (long) del);
+		// }
+		// }
+		// }
+		// }.runTaskTimer(TroubleInTerroristTown.ins, 2, 2);
 	}
 
-	private static void spawnJumpingBlock(Block b, double vel) {
+	public static void spawnJumpingBlock(Block b, double vel) {
 		@SuppressWarnings("deprecation")
 		FallingBlock fb = b.getWorld()
 				.spawnFallingBlock(b.getLocation().clone().add(0, 1, 0), b.getType(), b.getData());

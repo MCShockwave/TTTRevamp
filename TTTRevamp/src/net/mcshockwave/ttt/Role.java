@@ -48,6 +48,19 @@ public enum Role {
 		return null;
 	}
 
+	public static Role getPastRole(Player p) {
+		return getPastRole(p.getName());
+	}
+
+	public static Role getPastRole(String s) {
+		for (Role r : values()) {
+			if (r.all.contains(s)) {
+				return r;
+			}
+		}
+		return null;
+	}
+
 	public static Player getRandomPlayer(Role r) {
 		ArrayList<Player> pool = GameManager.getPlayers(false);
 		Collections.shuffle(pool);
