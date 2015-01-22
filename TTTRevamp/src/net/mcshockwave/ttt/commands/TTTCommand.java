@@ -97,6 +97,12 @@ public class TTTCommand implements CommandExecutor {
 				ParkourManager.generateNew(p, args.length > 1 ? Material.valueOf(args[1].toUpperCase())
 						: Material.QUARTZ_BLOCK);
 			}
+			
+			if (args[0].equalsIgnoreCase("fixhealth")) {
+				Player t = Bukkit.getPlayer(args[1]);
+				t.setMaxHealth(20);
+				p.sendMessage("§cFixed health of " + t.getName());
+			}
 		}
 
 		return true;

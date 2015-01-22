@@ -22,6 +22,7 @@ public class PlayerUtils {
 		clearEffects(p);
 		p.setFireTicks(0);
 		p.setAllowFlight(false);
+		p.setMaxHealth(20);
 		p.setHealth(p.getMaxHealth());
 		if (p.getGameMode() != GameMode.SURVIVAL) {
 			p.setGameMode(GameMode.SURVIVAL);

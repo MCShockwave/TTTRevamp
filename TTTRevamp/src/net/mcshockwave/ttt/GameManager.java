@@ -4,6 +4,7 @@ import net.mcshockwave.Guns.Gun;
 import net.mcshockwave.Guns.descriptors.AmmoType;
 import net.mcshockwave.MCS.MCShockwave;
 import net.mcshockwave.MCS.Utils.ItemMetaUtils;
+import net.mcshockwave.MCS.Utils.PacketUtils;
 import net.mcshockwave.MCS.Utils.SchedulerUtils;
 import net.mcshockwave.ttt.GameWorlds.GameMap;
 import net.mcshockwave.ttt.manage.FileElements;
@@ -25,6 +26,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Score;
@@ -56,9 +58,10 @@ public class GameManager {
 		}.runTaskLater(TroubleInTerroristTown.ins, 60);
 	}
 
-	public static SchedulerUtils	count	= null;
+	public static SchedulerUtils	count		= null;
+	public static BukkitTask		roundTimer	= null;
 
-	public static GameMap			map		= null;
+	public static GameMap			map			= null;
 
 	public static void startCount() {
 		state = GameState.LOBBY;
@@ -150,20 +153,24 @@ public class GameManager {
 		side.setDisplayName("§cTTT§7 " + t);
 
 		Score blank = side.getScore("§f");
-		blank.setScore(1);
+		blank.setScore(2);
 
 		String prep = "§7Preparing";
-		String role = Role.getRole(p) != null ? Role.getRole(p).color + Role.getRole(p).name() : "§8Spectator";
+		String role = Role.getRole(p) != null ? Role.getRole(p).color + Role.getRole(p).name() : null;
 
 		if (state == GameState.PREPARING) {
 			side.getScore(prep).setScore(1);
-			side.getScore(prep).setScore(0);
 		}
 		if (state == GameState.GAME) {
-			s.resetScores(prep);
+			if (s.getEntries().contains(prep))
+				s.resetScores(prep);
 
-			side.getScore(role).setScore(1);
-			side.getScore(role).setScore(0);
+			if (role != null) {
+				side.getScore(role).setScore(1);
+			}
+			if (specs.contains(p.getName())) {
+				side.getScore("§8Spectator").setScore(1);
+			}
 		}
 	}
 
@@ -211,6 +218,7 @@ public class GameManager {
 		ArrayList<Location> spawns = FileElements.getAll("player-spawn", GameWorlds.getGameWorld());
 
 		for (Player p : getPlayers()) {
+			PlayerUtils.resetPlayer(p);
 			p.teleport(spawns.get(rand.nextInt(spawns.size())).clone().add(0, 1, 0));
 			registerScoreboards();
 			basicKit(p);
@@ -271,6 +279,8 @@ public class GameManager {
 		for (Role r : Role.values()) {
 			for (Player p : r.getPlayers()) {
 				MCShockwave.send(r.color, p, "You are a" + (isVowel(r.name().charAt(0)) ? "n" : "") + " %s!", r.name());
+				PacketUtils.playTitle(p, 10, 40, 10, "§7You are a" + (isVowel(r.name().charAt(0)) ? "n" : "") + " "
+						+ r.color + r.name(), "§f");
 
 				if (r != Role.Innocent) {
 					p.getInventory().setItem(17,
@@ -286,6 +296,13 @@ public class GameManager {
 				+ (tsi == 1 ? "" : "s") + " this round", tsi);
 
 		registerScoreboards();
+
+		roundTimer = new BukkitRunnable() {
+			public void run() {
+				time++;
+				updateScoreboards();
+			}
+		}.runTaskTimer(TroubleInTerroristTown.ins, 20, 20);
 	}
 
 	public static boolean isVowel(char c) {
@@ -325,6 +342,10 @@ public class GameManager {
 
 		specs.clear();
 		innoSlay.clear();
+
+		if (roundTimer != null) {
+			roundTimer.cancel();
+		}
 
 		MCShockwave.broadcast("Game %s!", "ended");
 		if (Role.Traitor.all.size() > 0) {

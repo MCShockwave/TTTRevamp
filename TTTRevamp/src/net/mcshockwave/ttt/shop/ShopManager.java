@@ -41,6 +41,10 @@ public class ShopManager {
 				Button b = new Button(true, ts.m, ts.am, ts.da, "§c" + ts.display, ts.lore);
 				b.setOnClick(new ButtonRunnable() {
 					public void run(Player p, InventoryClickEvent event) {
+						if (ShopManager.getCredits(p.getName()) < ts.cost) {
+							p.sendMessage("§cNot enough credits!");
+							return;
+						}
 						ts.onClick(p);
 						MCShockwave.send(ChatColor.RED, p, "Bought %s for %s credit" + (ts.cost == 1 ? "" : "s") + "!",
 								ts.display, ts.cost);
@@ -57,12 +61,16 @@ public class ShopManager {
 			}
 		} else {
 			for (final DetectiveShop ds : DetectiveShop.values()) {
-				if (ds.timesBought.containsKey(p.getName()) && ds.timesBought.get(p.getName()) > ds.limit) {
+				if (ds.timesBought.containsKey(p.getName()) && ds.timesBought.get(p.getName()) >= ds.limit) {
 					continue;
 				}
 				Button b = new Button(true, ds.m, ds.am, ds.da, "§b" + ds.display, ds.lore);
 				b.setOnClick(new ButtonRunnable() {
 					public void run(Player p, InventoryClickEvent event) {
+						if (ShopManager.getCredits(p.getName()) < ds.cost) {
+							p.sendMessage("§cNot enough credits!");
+							return;
+						}
 						ds.onClick(p);
 						MCShockwave.send(ChatColor.AQUA, p,
 								"Bought %s for %s credit" + (ds.cost == 1 ? "" : "s") + "!", ds.display, ds.cost);

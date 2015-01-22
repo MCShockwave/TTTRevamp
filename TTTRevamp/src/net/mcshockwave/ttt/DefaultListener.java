@@ -331,8 +331,9 @@ public class DefaultListener implements Listener {
 			Player p = (Player) ee;
 			Player d = (Player) de;
 
-			if (GameManager.specs.contains(d.getName())) {
+			if (GameManager.specs.contains(d.getName()) || GameManager.specs.contains(p.getName())) {
 				event.setCancelled(true);
+				return;
 			}
 
 			if (d.getItemInHand() != null && d.getItemInHand().getType() != Material.AIR) {
@@ -349,8 +350,7 @@ public class DefaultListener implements Listener {
 
 	@EventHandler
 	public void onVehicleDamage(VehicleDamageEvent event) {
-		if (event.getVehicle().getType() == EntityType.BOAT && healerHealth.containsKey(event.getVehicle())
-				&& event.getAttacker().getType() == EntityType.PLAYER) {
+		if (event.getVehicle().getType() == EntityType.BOAT && event.getAttacker().getType() == EntityType.PLAYER) {
 			Vehicle ee = event.getVehicle();
 			Damageable d = (Damageable) event.getAttacker();
 
@@ -430,12 +430,17 @@ public class DefaultListener implements Listener {
 
 		event.setDeathMessage("");
 
+		boolean isSpec = GameManager.specs.contains(p.getName());
+
 		GameManager.onDeath(p, event);
+
+		boolean becameSpec = GameManager.specs.contains(p.getName()) && !isSpec;
 
 		PlayerRespawnEvent pre = new PlayerRespawnEvent(p, getRespawnLocation(p), false);
 		Bukkit.getPluginManager().callEvent(pre);
+		p.setMaxHealth(20);
 		p.setHealth(p.getMaxHealth());
-		p.teleport(pre.getRespawnLocation());
+		p.teleport(becameSpec ? p.getLocation() : pre.getRespawnLocation());
 		new BukkitRunnable() {
 			public void run() {
 				p.setVelocity(new Vector());
@@ -510,8 +515,8 @@ public class DefaultListener implements Listener {
 		}
 		if (GameManager.specs.contains(p.getName())) {
 			return FileElements.getLoc("lobby", GameWorlds.getGameWorld());
-		} else
+		} else {
 			return FileElements.getLoc("TTT-spawnpoint", GameWorlds.getGameWorld());
+		}
 	}
-
 }
