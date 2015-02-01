@@ -6,11 +6,13 @@ import net.mcshockwave.MCS.MCShockwave;
 import net.mcshockwave.MCS.Utils.ItemMetaUtils;
 import net.mcshockwave.MCS.Utils.PacketUtils;
 import net.mcshockwave.MCS.Utils.SchedulerUtils;
+import net.mcshockwave.ttt.CorpseManager.Corpse;
 import net.mcshockwave.ttt.GameWorlds.GameMap;
 import net.mcshockwave.ttt.manage.FileElements;
 import net.mcshockwave.ttt.shop.DetectiveShop;
 import net.mcshockwave.ttt.shop.ShopManager;
 import net.mcshockwave.ttt.shop.TraitorShop;
+import net.mcshockwave.ttt.utils.DamageCauseInfo;
 import net.mcshockwave.ttt.utils.PlayerUtils;
 
 import org.bukkit.Bukkit;
@@ -35,8 +37,11 @@ import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Random;
+
+import org.apache.commons.lang.WordUtils;
 
 public class GameManager {
 
@@ -436,6 +441,8 @@ public class GameManager {
 	public static HashMap<String, Integer>	innoSlay			= new HashMap<>();
 
 	public static void onDeath(Player p, PlayerDeathEvent event) {
+		p.getWorld().playSound(p.getLocation(), Sound.GHAST_SCREAM, 2, 1);
+
 		Role r = Role.getRole(p);
 
 		if (r != null) {
@@ -476,8 +483,21 @@ public class GameManager {
 				}
 			}
 
-			MCShockwave.broadcast(r.color, "%s was a" + (isVowel(r.name().charAt(0)) ? "n" : "") + " %s!", p.getName(),
-					r.name());
+			Material wepMat = null;
+			String wepName = null;
+			if (p.getKiller() != null) {
+				ItemStack wep = p.getKiller().getItemInHand();
+				if (wep != null && wep.getType() != Material.AIR) {
+					wepMat = wep.getType();
+					wepName = ItemMetaUtils.hasCustomName(wep) ? ChatColor.stripColor(ItemMetaUtils.getItemName(wep))
+							: WordUtils.capitalizeFully(wepMat.name().replace('_', ' '));
+				} else {
+					wepMat = Material.STICK;
+					wepName = "fist";
+				}
+			}
+			new Corpse(p.getLocation(), p.getName(), DamageCauseInfo.getInfoFor(p.getLastDamageCause().getCause()),
+					wepName, wepMat);
 		}
 
 		if (state == GameState.GAME) {
@@ -503,19 +523,42 @@ public class GameManager {
 	public static void updatePlayerList(Player p) {
 		ArrayList<String> lo = new ArrayList<>();
 
-		lo.add("§a§nAlive");
+		boolean showMIA = specs.contains(p.getName()) || Role.getRole(p) == Role.Traitor;
+
+		ArrayList<String> alive = new ArrayList<>();
+		ArrayList<String> mia = new ArrayList<>();
+		ArrayList<String> comb = new ArrayList<>();
 		for (Player a : getPlayers(false)) {
-			lo.add((Role.getRole(a) == Role.Detective ? "§9" : Role.getRole(a) == Role.Traitor
+			String al = (Role.getRole(a) == Role.Detective ? "§9" : Role.getRole(a) == Role.Traitor
 					&& Role.getRole(p) == Role.Traitor ? "§c" : "")
-					+ a.getName());
+					+ a.getName();
+			alive.add(al);
+			comb.add(al);
+		}
+		for (String s : specs) {
+			if (CorpseManager.getCorpseFromName(s) != null && !CorpseManager.getCorpseFromName(s).identified) {
+				mia.add(s);
+				comb.add(s);
+			}
+		}
+
+		Collections.sort(comb);
+
+		lo.add("§a§nAlive");
+		for (String s : showMIA ? alive : comb) {
+			lo.add(s);
+		}
+		if (showMIA) {
+			lo.add("§6§nMissing in Action");
+			for (String s : mia) {
+				lo.add(Role.getPastRole(s).color + s);
+			}
 		}
 		lo.add("§4§nConfirmed Dead");
 		for (String s : specs) {
-			if (Bukkit.getPlayer(s) != null) {
-				Player sp = Bukkit.getPlayer(s);
-				if (Role.getPastRole(sp) != null) {
-					lo.add(Role.getPastRole(sp).color + sp.getName());
-				}
+			if (Role.getPastRole(s) != null && CorpseManager.getCorpseFromName(s) != null
+					&& CorpseManager.getCorpseFromName(s).identified) {
+				lo.add(Role.getPastRole(s).color + s);
 			}
 		}
 		lo.add("§d§nSpectators");

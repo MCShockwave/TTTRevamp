@@ -8,6 +8,7 @@ import net.mcshockwave.MCS.Utils.ItemMetaUtils;
 import net.mcshockwave.MCS.Utils.LocUtils;
 import net.mcshockwave.MCS.Utils.PacketUtils;
 import net.mcshockwave.MCS.Utils.PacketUtils.ParticleEffect;
+import net.mcshockwave.ttt.CorpseManager.Corpse;
 import net.mcshockwave.ttt.GameManager.GameState;
 import net.mcshockwave.ttt.manage.FileElements;
 import net.mcshockwave.ttt.shop.ShopManager;
@@ -45,14 +46,18 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.hanging.HangingBreakEvent;
+import org.bukkit.event.hanging.HangingBreakEvent.RemoveCause;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerEggThrowEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerPickupItemEvent;
@@ -106,6 +111,10 @@ public class DefaultListener implements Listener {
 		final Player p = event.getPlayer();
 		Block b = event.getClickedBlock();
 		ItemStack it = event.getItem();
+
+		if (GameManager.specs.contains(p.getName())) {
+			event.setCancelled(true);
+		}
 
 		if (b != null) {
 			if (b.getType().name().contains("SIGN")) {
@@ -212,6 +221,7 @@ public class DefaultListener implements Listener {
 		}
 	}
 
+	@SuppressWarnings("deprecation")
 	@EventHandler
 	public void onEntityExplode(EntityExplodeEvent event) {
 		event.blockList().clear();
@@ -219,14 +229,17 @@ public class DefaultListener implements Listener {
 			for (Entity e : event.getEntity().getNearbyEntities(25, 25, 25)) {
 				if (e instanceof Player) {
 					Player p = (Player) e;
+					if (GameManager.specs.contains(p.getName())) {
+						continue;
+					}
 
 					double distSq = p.getLocation().distance(event.getLocation());
 					double dmg = (distSq > 15 * 15) ? p.getMaxHealth() / distSq - (15 * 15) : p.getMaxHealth();
-					if (p.hasLineOfSight(event.getEntity())) {
-						p.damage(dmg, event.getEntity());
-					} else {
-						p.damage(dmg / 2, event.getEntity());
+					if (!p.hasLineOfSight(event.getEntity())) {
+						dmg /= 2;
 					}
+					p.setLastDamageCause(new EntityDamageEvent(p, DamageCause.BLOCK_EXPLOSION, dmg));
+					p.damage(dmg, event.getEntity().getVehicle());
 				}
 			}
 		}
@@ -318,6 +331,37 @@ public class DefaultListener implements Listener {
 				event.setCancelled(true);
 			}
 		}
+
+		if (CorpseManager.getCorpseFromEntity(ee) != null) {
+			event.setCancelled(true);
+			ee.setFireTicks(0);
+		}
+	}
+
+	@EventHandler
+	public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+		Player p = event.getPlayer();
+		Entity e = event.getRightClicked();
+
+		if (CorpseManager.getCorpseFromEntity(e) != null) {
+			Corpse c = CorpseManager.getCorpseFromEntity(e);
+			if (!c.identified && !GameManager.specs.contains(p.getName())) {
+				c.identify(p);
+			}
+			if (Role.getRole(p) == Role.Detective) {
+				c.byDet = true;
+			}
+			c.getMenu().open(p);
+			event.setCancelled(true);
+		}
+	}
+
+	@EventHandler
+	public void onEntityTarget(EntityTargetEvent event) {
+		if (CorpseManager.getCorpseFromEntity(event.getEntity()) != null) {
+			event.setTarget(null);
+			event.setCancelled(true);
+		}
 	}
 
 	public static HashMap<Entity, Integer>	healerHealth	= new HashMap<>();
@@ -329,7 +373,7 @@ public class DefaultListener implements Listener {
 
 		if (ee instanceof Player && de instanceof Player) {
 			Player p = (Player) ee;
-			Player d = (Player) de;
+			final Player d = (Player) de;
 
 			if (GameManager.specs.contains(d.getName()) || GameManager.specs.contains(p.getName())) {
 				event.setCancelled(true);
@@ -339,8 +383,12 @@ public class DefaultListener implements Listener {
 			if (d.getItemInHand() != null && d.getItemInHand().getType() != Material.AIR) {
 				ItemStack it = d.getItemInHand();
 				if (it.getType() == Material.GOLD_SWORD) {
-					d.setItemInHand(null);
 					event.setDamage(p.getMaxHealth() * 10);
+					new BukkitRunnable() {
+						public void run() {
+							d.setItemInHand(null);
+						}
+					}.runTaskLater(TroubleInTerroristTown.ins, 1);
 				}
 			} else {
 				event.setDamage(0);
@@ -497,6 +545,13 @@ public class DefaultListener implements Listener {
 	@EventHandler
 	public void onItemDespawn(ItemDespawnEvent event) {
 		if (event.getEntity().getLocation().getBlock().getType().name().contains("_PLATE")) {
+			event.setCancelled(true);
+		}
+	}
+
+	@EventHandler
+	public void onHangingBreak(HangingBreakEvent event) {
+		if (event.getCause() != RemoveCause.PHYSICS) {
 			event.setCancelled(true);
 		}
 	}

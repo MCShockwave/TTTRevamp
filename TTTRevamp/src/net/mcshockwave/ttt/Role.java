@@ -82,6 +82,10 @@ public enum Role {
 		return ret;
 	}
 
+	public String getArticle() {
+		return GameManager.isVowel(name().charAt(0)) ? "an" : "a";
+	}
+
 	public static void generate() {
 		int count = GameManager.getPlayers(false).size();
 
