@@ -23,23 +23,20 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class CorpseManager {
 
-	public static ArrayList<Corpse>	corpses	= new ArrayList<>();
+	public static HashMap<String, Entity>	corpses		= new HashMap<>();
+	public static ArrayList<Corpse>			corpList	= new ArrayList<>();
 
 	public static Corpse getCorpseFromName(String name) {
-		for (Corpse c : corpses) {
-			if (c.name.equals(name)) {
-				return c;
-			}
-		}
-		return null;
+		return getCorpseFromEntity(corpses.get(name));
 	}
 
 	public static Corpse getCorpseFromEntity(Entity e) {
-		for (Corpse c : corpses) {
-			if (c.ent.getBukkitEntity().getEntityId() == e.getEntityId()) {
+		for (Corpse c : corpList) {
+			if (c.ent.getBukkitEntity().equals(e)) {
 				return c;
 			}
 		}
@@ -64,6 +61,8 @@ public class CorpseManager {
 			this.causeOfDeath = causeOfDeath;
 			this.weaponMat = weaponMat;
 			this.weaponName = weaponName;
+			this.identified = false;
+			this.byDet = false;
 			timeOfDeath = System.currentTimeMillis();
 			double closDis = -1;
 			Player closPl = null;
@@ -77,7 +76,8 @@ public class CorpseManager {
 			}
 			closest = closPl.getName();
 
-			corpses.add(this);
+			corpList.add(this);
+			corpses.put(name, ent.getBukkitEntity());
 		}
 
 		public Role getRole() {
@@ -87,13 +87,9 @@ public class CorpseManager {
 		public void identify(Player id) {
 			ent.setCustomName(getRole().color + name);
 			identified = true;
-
+			MCShockwave.broadcast(getRole().color, "%s has identified the body of %s! They were "
+					+ getRole().getArticle() + " %s!", "§6§o" + id.getName(), name, getRole().name());
 			GameManager.updatePlayerLists();
-
-			MCShockwave.broadcast(getRole().color,
-					"%s has identified the body of %s! They were a"
-							+ (GameManager.isVowel(getRole().name().charAt(0)) ? "n" : "") + " %s!",
-					"§6§o" + id.getName(), name, getRole().name());
 		}
 
 		public ItemMenu getMenu() {
@@ -109,8 +105,8 @@ public class CorpseManager {
 			m.addButton(cause, 2 + detOff);
 
 			if (weaponMat != null && weaponName != null) {
-				Button wep = new Button(false, weaponMat, 1, 0, "§eIt seems the weapon used was a"
-						+ (GameManager.isVowel(weaponName.charAt(0)) ? "n" : "") + " " + weaponName);
+				Button wep = new Button(false, weaponMat, 1, 0, "§eAccording to the wounds, the weapon used was a"
+						+ (GameManager.isVowel(weaponName.charAt(0)) ? "n" : ""), "    §e" + weaponName);
 				m.addButton(wep, 4 + detOff);
 			}
 

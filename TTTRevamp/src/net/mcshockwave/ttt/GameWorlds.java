@@ -278,99 +278,101 @@ public enum GameWorlds {
 		s.setLine(3, "to parkour");
 		s.update();
 
-		// if (lobbyAnimation != null) {
-		// lobbyAnimation.cancel();
-		// }
-		// lobbyAnimation = new BukkitRunnable() {
-		// // why did I do this? idk
-		// public void run() {
-		// if (w.getPlayers().size() == 0) {
-		// return;
-		// }
-		//
-		// if (rand.nextInt(500) == 0) {
-		// int y = yval + 1;
-		// for (int x = -rad; x <= rad; x += spacing) {
-		// for (int z = -rad; z <= rad; z += spacing) {
-		// Block b = w.getBlockAt(x, y, z);
-		// if (b.getType() == li) {
-		// spawnJumpingBlock(b, rand.nextDouble());
-		// }
-		// }
-		// }
-		// }
-		//
-		// if (rand.nextInt(50) == 0) {
-		// for (int i = 0; i < rand.nextInt(5) + 5; i++) {
-		// int xco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
-		// int zco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
-		// int y = yval + 1;
-		//
-		// double vel = rand.nextDouble() + 0.5;
-		//
-		// for (int x = 0; x <= spacing; x++) {
-		// for (int z = 0; z <= spacing; z++) {
-		// Block b = w.getBlockAt(xco + x, y, zco + z);
-		// if (b.getType() == ba) {
-		// spawnJumpingBlock(b, vel + (rand.nextGaussian() / 100));
-		// }
-		// }
-		// }
-		// }
-		// }
-		//
-		// if (rand.nextInt(750) == 0) {
-		// int xadd = rand.nextBoolean() ? 1 : -1;
-		// int zadd = rand.nextBoolean() ? 1 : -1;
-		//
-		// int y = yval + 1;
-		//
-		// int xstart = rad * -xadd;
-		// int zstart = rad * -zadd;
-		//
-		// w.playSound(new Location(w, xstart, y, zstart),
-		// Sound.FIREWORK_LAUNCH, 1000, 0);
-		//
-		// final double vel = rand.nextDouble() / 5 + 0.2;
-		//
-		// double del = 0;
-		// for (int d = 0; d <= rad * 2; d++) {
-		// del += 1.5;
-		// final ArrayList<Block> change = new ArrayList<>();
-		//
-		// int dx = d * xadd;
-		// int dz = d * zadd;
-		//
-		// int xc = xstart + dx;
-		// int zc = zstart + dz;
-		//
-		// for (int x = xstart; (xadd < 0 ? x >= xc : x <= xc); x += xadd) {
-		// Block b = w.getBlockAt(x, y, zc);
-		// if (!change.contains(b)) {
-		// change.add(b);
-		// }
-		// }
-		// for (int z = zstart; (zadd < 0 ? z >= zc : z <= zc); z += zadd) {
-		// Block b = w.getBlockAt(xc, y, z);
-		// if (!change.contains(b)) {
-		// change.add(b);
-		// }
-		// }
-		//
-		// new BukkitRunnable() {
-		// public void run() {
-		// for (Block b : change) {
-		// if (b.getType() == ac && b.getRelative(BlockFace.UP).getType() ==
-		// Material.AIR) {
-		// spawnJumpingBlock(b, vel);
-		// }
-		// }
-		// }
-		// }.runTaskLater(TroubleInTerroristTown.ins, (long) del);
-		// }
-		// }
-		// }
-		// }.runTaskTimer(TroubleInTerroristTown.ins, 2, 2);
+		if (lobbyAnimation != null) {
+			lobbyAnimation.cancel();
+		}
+		lobbyAnimation = new BukkitRunnable() {
+			// why did I do this? idk
+			public void run() {
+				if (w.getPlayers().size() == 0) {
+					return;
+				}
+
+				// if (rand.nextInt(500) == 0) {
+				// int y = yval + 1;
+				// for (int x = -rad; x <= rad; x += spacing) {
+				// for (int z = -rad; z <= rad; z += spacing) {
+				// Block b = w.getBlockAt(x, y, z);
+				// if (b.getType() == li) {
+				// spawnJumpingBlock(b, rand.nextDouble());
+				// }
+				// }
+				// }
+				// }
+
+				if (rand.nextInt(50) == 0) {
+					for (int i = 0; i < rand.nextInt(5) + 5; i++) {
+						int xco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
+						int zco = ((int) (rand.nextInt(rad * 2) - rad) / spacing) * spacing;
+						int y = yval + 1;
+
+						double vel = rand.nextDouble() + 0.5;
+
+						for (int x = 0; x <= spacing; x++) {
+							for (int z = 0; z <= spacing; z++) {
+								Block b = w.getBlockAt(xco + x, y, zco + z);
+								if (b.getType() == ba) {
+									spawnJumpingBlock(b, vel + (rand.nextGaussian() / 100));
+								}
+							}
+						}
+					}
+				}
+				//
+				// if (rand.nextInt(750) == 0) {
+				// int xadd = rand.nextBoolean() ? 1 : -1;
+				// int zadd = rand.nextBoolean() ? 1 : -1;
+				//
+				// int y = yval + 1;
+				//
+				// int xstart = rad * -xadd;
+				// int zstart = rad * -zadd;
+				//
+				// w.playSound(new Location(w, xstart, y, zstart),
+				// Sound.FIREWORK_LAUNCH, 1000, 0);
+				//
+				// final double vel = rand.nextDouble() / 5 + 0.2;
+				//
+				// double del = 0;
+				// for (int d = 0; d <= rad * 2; d++) {
+				// del += 1.5;
+				// final ArrayList<Block> change = new ArrayList<>();
+				//
+				// int dx = d * xadd;
+				// int dz = d * zadd;
+				//
+				// int xc = xstart + dx;
+				// int zc = zstart + dz;
+				//
+				// for (int x = xstart; (xadd < 0 ? x >= xc : x <= xc); x +=
+				// xadd) {
+				// Block b = w.getBlockAt(x, y, zc);
+				// if (!change.contains(b)) {
+				// change.add(b);
+				// }
+				// }
+				// for (int z = zstart; (zadd < 0 ? z >= zc : z <= zc); z +=
+				// zadd) {
+				// Block b = w.getBlockAt(xc, y, z);
+				// if (!change.contains(b)) {
+				// change.add(b);
+				// }
+				// }
+				//
+				// new BukkitRunnable() {
+				// public void run() {
+				// for (Block b : change) {
+				// if (b.getType() == ac &&
+				// b.getRelative(BlockFace.UP).getType() == Material.AIR) {
+				// spawnJumpingBlock(b, vel);
+				// }
+				// }
+				// }
+				// }.runTaskLater(TroubleInTerroristTown.ins, (long) del);
+				// }
+				// }
+			}
+		}.runTaskTimer(TroubleInTerroristTown.ins, 2, 2);
 	}
 
 	public static void spawnJumpingBlock(Block b, double vel) {

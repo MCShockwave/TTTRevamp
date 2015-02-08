@@ -13,6 +13,7 @@ import net.mcshockwave.ttt.shop.DetectiveShop;
 import net.mcshockwave.ttt.shop.ShopManager;
 import net.mcshockwave.ttt.shop.TraitorShop;
 import net.mcshockwave.ttt.utils.DamageCauseInfo;
+import net.mcshockwave.ttt.utils.InfoBook;
 import net.mcshockwave.ttt.utils.PlayerUtils;
 
 import org.bukkit.Bukkit;
@@ -21,6 +22,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -70,6 +72,10 @@ public class GameManager {
 
 	public static void startCount() {
 		state = GameState.LOBBY;
+
+		for (Player p : getPlayers()) {
+			lobbyKit(p);
+		}
 
 		count = SchedulerUtils.getNew();
 		int[] broad = { 45, 30, 15, 10, 5, 4, 3, 2, 1 };
@@ -153,6 +159,11 @@ public class GameManager {
 	public static void updateScoreboard(Player p) {
 		Scoreboard s = p.getScoreboard();
 		Objective side = s.getObjective(DisplaySlot.SIDEBAR);
+
+		if (side == null) {
+			registerScoreboard(p);
+			return;
+		}
 
 		String t = String.format("%d:%02d", time / 60, (time % 60));
 		side.setDisplayName("§cTTT§7 " + t);
@@ -352,6 +363,9 @@ public class GameManager {
 			roundTimer.cancel();
 		}
 
+		CorpseManager.corpses.clear();
+		CorpseManager.corpList.clear();
+
 		MCShockwave.broadcast("Game %s!", "ended");
 		if (Role.Traitor.all.size() > 0) {
 			int si = Role.Traitor.all.size();
@@ -425,6 +439,9 @@ public class GameManager {
 		}
 
 		PlayerUtils.resetPlayer(p);
+		p.getInventory()
+				.setItem(8, ItemMetaUtils.setItemName(new ItemStack(Material.FEATHER), "§6Teleport to Players"));
+		p.getInventory().setItem(7, InfoBook.getBookItem());
 
 		p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0));
 		if (hide) {
@@ -500,6 +517,10 @@ public class GameManager {
 					wepName, wepMat);
 		}
 
+		if (p.getPassenger() != null && p.getPassenger().getType() == EntityType.PRIMED_TNT) {
+			p.getPassenger().remove();
+		}
+
 		if (state == GameState.GAME) {
 			if (Role.Traitor.getPlayers().size() == 0) {
 				MCShockwave.broadcast(Role.Innocent.color, "%s win!", "Innocents");
@@ -512,6 +533,11 @@ public class GameManager {
 
 		updateScoreboards();
 		updatePlayerLists();
+	}
+
+	public static void lobbyKit(Player p) {
+		PlayerUtils.clearInv(p);
+		p.getInventory().setItem(8, InfoBook.getBookItem());
 	}
 
 	public static void updatePlayerLists() {
@@ -536,7 +562,8 @@ public class GameManager {
 			comb.add(al);
 		}
 		for (String s : specs) {
-			if (CorpseManager.getCorpseFromName(s) != null && !CorpseManager.getCorpseFromName(s).identified) {
+			Corpse c = CorpseManager.getCorpseFromName(s);
+			if (c != null && !c.identified) {
 				mia.add(s);
 				comb.add(s);
 			}
@@ -545,8 +572,14 @@ public class GameManager {
 		Collections.sort(comb);
 
 		lo.add("§a§nAlive");
-		for (String s : showMIA ? alive : comb) {
-			lo.add(s);
+		if (showMIA) {
+			for (String s : alive) {
+				lo.add(s);
+			}
+		} else {
+			for (String s : comb) {
+				lo.add(s);
+			}
 		}
 		if (showMIA) {
 			lo.add("§6§nMissing in Action");
@@ -556,8 +589,8 @@ public class GameManager {
 		}
 		lo.add("§4§nConfirmed Dead");
 		for (String s : specs) {
-			if (Role.getPastRole(s) != null && CorpseManager.getCorpseFromName(s) != null
-					&& CorpseManager.getCorpseFromName(s).identified) {
+			Corpse c = CorpseManager.getCorpseFromName(s);
+			if (Role.getPastRole(s) != null && c != null && c.identified) {
 				lo.add(Role.getPastRole(s).color + s);
 			}
 		}

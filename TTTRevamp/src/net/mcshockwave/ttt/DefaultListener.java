@@ -4,6 +4,8 @@ import net.mcshockwave.Guns.Gun;
 import net.mcshockwave.Guns.descriptors.GunType;
 import net.mcshockwave.MCS.MCShockwave;
 import net.mcshockwave.MCS.Menu.ItemMenu;
+import net.mcshockwave.MCS.Menu.ItemMenu.Button;
+import net.mcshockwave.MCS.Menu.ItemMenu.ButtonRunnable;
 import net.mcshockwave.MCS.Utils.ItemMetaUtils;
 import net.mcshockwave.MCS.Utils.LocUtils;
 import net.mcshockwave.MCS.Utils.PacketUtils;
@@ -39,6 +41,7 @@ import org.bukkit.entity.Vehicle;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
@@ -74,6 +77,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
 
@@ -154,6 +158,28 @@ public class DefaultListener implements Listener {
 				p.getWorld().playSound(p.getLocation(), Sound.FUSE, 10, 0);
 			}
 		}
+
+		if (GameManager.specs.contains(p.getName()) && it.getType() == Material.FEATHER
+				&& event.getAction() != Action.PHYSICAL) {
+			int size = GameManager.getPlayers(false).size();
+			ItemMenu m = new ItemMenu("Teleport to Players", size);
+			int id = 0;
+			for (final Player sp : GameManager.getPlayers(false)) {
+				Button tp = new Button(true, Material.SKULL_ITEM, 1, 3, sp.getName());
+				ItemMetaUtils.setHeadName(tp.button, sp.getName());
+				tp.setOnClick(new ButtonRunnable() {
+					public void run(Player p, InventoryClickEvent event) {
+						p.teleport(sp.getLocation());
+					}
+				});
+				m.addButton(tp, id++);
+			}
+			m.open(p);
+		}
+
+		if (it != null && it.getType() == Material.WRITTEN_BOOK && event.getAction().name().contains("RIGHT_CLICK")) {
+			event.setCancelled(false);
+		}
 	}
 
 	@EventHandler
@@ -221,33 +247,64 @@ public class DefaultListener implements Listener {
 		}
 	}
 
-	@SuppressWarnings("deprecation")
 	@EventHandler
 	public void onEntityExplode(EntityExplodeEvent event) {
 		event.blockList().clear();
-		if (event.getEntityType() == EntityType.PRIMED_TNT) {
+		if (event.getEntity() != null && event.getEntityType() == EntityType.PRIMED_TNT
+				&& GameManager.state == GameState.GAME) {
+			ArrayList<Player> aft = new ArrayList<>();
 			for (Entity e : event.getEntity().getNearbyEntities(25, 25, 25)) {
 				if (e instanceof Player) {
 					Player p = (Player) e;
 					if (GameManager.specs.contains(p.getName())) {
 						continue;
 					}
-
-					double distSq = p.getLocation().distance(event.getLocation());
-					double dmg = (distSq > 15 * 15) ? p.getMaxHealth() / distSq - (15 * 15) : p.getMaxHealth();
-					if (!p.hasLineOfSight(event.getEntity())) {
-						dmg /= 2;
+					if (Role.getRole(p) == Role.Traitor || event.getEntity().getVehicle() != null
+							&& p.equals(event.getEntity().getVehicle())) {
+						aft.add(p);
+						continue;
 					}
-					p.setLastDamageCause(new EntityDamageEvent(p, DamageCause.BLOCK_EXPLOSION, dmg));
-					p.damage(dmg, event.getEntity().getVehicle());
+					double distSq = p.getLocation().distanceSquared(event.getLocation());
+					dmgJihad(p, distSq);
 				}
 			}
+			for (Player p : aft) {
+				double distSq = p.getLocation().distanceSquared(event.getLocation());
+				dmgJihad(p, distSq);
+			}
 		}
+	}
+
+	@SuppressWarnings("deprecation")
+	public static void dmgJihad(Player p, double distSq) {
+		double dmg = (distSq > 15 * 15) ? (p.getMaxHealth() * 5 / distSq - (15 * 15)) : p.getMaxHealth();
+		double hp = p.getHealth();
+		hp -= dmg;
+		if (hp < 0) {
+			hp = 0;
+		}
+		p.setLastDamageCause(new EntityDamageEvent(p, DamageCause.BLOCK_EXPLOSION, dmg));
+		p.setHealth(hp);
 	}
 
 	@EventHandler(priority = EventPriority.LOW)
 	public void onPlayerChat(AsyncPlayerChatEvent event) {
 		Player p = event.getPlayer();
+
+		if (event.getMessage().startsWith("!")) {
+			if (Role.getRole(p) == Role.Traitor) {
+				for (Player r : Bukkit.getOnlinePlayers()) {
+					if (Role.getRole(r) != Role.Traitor) {
+						event.getRecipients().remove(r);
+					}
+				}
+				event.setMessage("§c" + event.getMessage());
+			} else {
+				event.setCancelled(true);
+				p.sendMessage("§cYou are not a traitor!");
+			}
+		}
+
 		if (GameManager.specs.contains(p.getName()) && !GameManager.exclude.contains(p.getName())
 				&& !event.getMessage().startsWith("@")) {
 			for (Player r : GameManager.getPlayers(false)) {
@@ -454,9 +511,12 @@ public class DefaultListener implements Listener {
 
 	@EventHandler
 	public void onPlayerDropItem(PlayerDropItemEvent event) {
-		if (event.getItemDrop().getItemStack().getType() == Material.IRON_SWORD
-				|| event.getItemDrop().getItemStack().getType() == Material.PAPER) {
-			event.setCancelled(true);
+		Material m = event.getItemDrop().getItemStack().getType();
+		Material[] disabled = { Material.IRON_SWORD, Material.PAPER, Material.GOLD_INGOT, Material.WRITTEN_BOOK,
+				Material.FEATHER };
+		for (Material mc : disabled) {
+			if (m == mc)
+				event.setCancelled(true);
 		}
 	}
 
