@@ -1,5 +1,7 @@
 package net.mcshockwave.ttt.shop;
 
+import net.mcshockwave.Guns.Gun;
+import net.mcshockwave.Guns.addons.Addon;
 import net.mcshockwave.MCS.Utils.ItemMetaUtils;
 
 import org.bukkit.Material;
@@ -38,7 +40,47 @@ public enum TraitorShop {
 		1,
 		"Left click to set a waypoint,",
 		"Right click to go to that waypoint.",
-		"Unlimited uses. 3 second chargeup.");
+		"Unlimited uses. 3 second chargeup."),
+	Flare_Gun(
+		"Flare Gun",
+		Material.GOLD_PICKAXE,
+		1,
+		0,
+		2,
+		1,
+		"Shoot corpses to burn their remains,",
+		"removing all evidence of their death."),
+	Poison_Dart_Gun(
+		"Poison Dart Gun",
+		Material.DIAMOND_PICKAXE,
+		1,
+		0,
+		2,
+		1,
+		"Shoot someone to give them permanent wither,",
+		"making them slowly die."),
+	Poltergeist(
+		"Poltergeist",
+		Material.IRON_PICKAXE,
+		1,
+		0,
+		1,
+		1,
+		"Shoot a corpse or player to launch them far",
+		"away."),
+	C4(
+		"C4",
+		Material.TNT,
+		1,
+		0,
+		1,
+		1,
+		"Place to plant. It will slowly and quietly",
+		"tick down for 45 seconds, increasing the",
+		"number of ticks until it reaches 0, blowing",
+		"up and killing anyone around it. Players can",
+		"try to disarm it by clicking it and choosing",
+		"a wire. If they fail, it blows up.");
 
 	public String					display, desc[];
 	public int						cost;
@@ -77,6 +119,18 @@ public enum TraitorShop {
 		}
 		if (this == Teleporter) {
 			p.getInventory().addItem(ItemMetaUtils.setItemName(new ItemStack(Material.CLAY_BALL), "§6Teleporter"));
+		}
+		if (this == Flare_Gun) {
+			p.getInventory().addItem(Gun.TTT_FLARE_GUN.getItem());
+		}
+		if (this == Poison_Dart_Gun) {
+			p.getInventory().addItem(Gun.TTT_POISON_GUN.getItem());
+		}
+		if (this == Poltergeist) {
+			p.getInventory().addItem(Addon.Bottomless_Clip.add(Gun.TTT_POLTERGEIST.getItem()));
+		}
+		if (this == C4) {
+			p.getInventory().addItem(ItemMetaUtils.setItemName(new ItemStack(Material.TNT), "§cC4 - Place to plant"));
 		}
 	}
 

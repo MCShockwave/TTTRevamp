@@ -50,7 +50,7 @@ public class ParkourManager {
 
 		ArrayList<Block> blocks = generateJumps(l);
 
-		long delay = 40;
+		long delay = 200;
 		for (final Block set : blocks) {
 			set.setType(m);
 			global.add(set);

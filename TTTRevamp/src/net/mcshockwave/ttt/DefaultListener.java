@@ -19,13 +19,16 @@ import net.mcshockwave.ttt.utils.PlayerUtils;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.DyeColor;
 import org.bukkit.Effect;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.SkullType;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
-import org.bukkit.block.Sign;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.Skull;
 import org.bukkit.entity.Damageable;
 import org.bukkit.entity.Egg;
 import org.bukkit.entity.EnderPearl;
@@ -63,6 +66,8 @@ import org.bukkit.event.player.PlayerEggThrowEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerLoginEvent;
+import org.bukkit.event.player.PlayerLoginEvent.Result;
 import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -75,13 +80,26 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
 
+import org.apache.commons.lang.WordUtils;
+
 public class DefaultListener implements Listener {
+
+	@EventHandler
+	public void onPlayerLogin(PlayerLoginEvent event) {
+		Player p = event.getPlayer();
+
+		if (KarmaManager.getKarma(p.getName()) <= KarmaManager.KARMA_LIMIT) {
+			event.setResult(Result.KICK_BANNED);
+			event.setKickMessage("§cYour karma is too low! It will be reset within a day!");
+		}
+	}
 
 	@EventHandler
 	public void onPlayerJoin(PlayerJoinEvent event) {
@@ -103,6 +121,8 @@ public class DefaultListener implements Listener {
 			GameManager.spectate(p, true);
 			GameManager.registerScoreboard(p);
 			GameManager.updatePlayerLists();
+		} else if (GameManager.state == GameState.LOBBY || GameManager.state == GameState.IDLE) {
+			GameManager.lobbyKit(p);
 		}
 	}
 
@@ -110,26 +130,15 @@ public class DefaultListener implements Listener {
 
 	public static Random					rand		= new Random();
 
+	@SuppressWarnings("deprecation")
 	@EventHandler
 	public void onPlayerInteract(PlayerInteractEvent event) {
 		final Player p = event.getPlayer();
-		Block b = event.getClickedBlock();
+		final Block b = event.getClickedBlock();
 		ItemStack it = event.getItem();
 
 		if (GameManager.specs.contains(p.getName())) {
 			event.setCancelled(true);
-		}
-
-		if (b != null) {
-			if (b.getType().name().contains("SIGN")) {
-				Sign s = (Sign) b.getState();
-
-				if (s.getLine(0).contains("Parkour")) {
-					Material[] choose = { Material.GRASS, Material.WOOD, Material.COBBLESTONE, Material.LAPIS_BLOCK,
-							Material.WOOL, Material.SNOW_BLOCK, Material.NETHERRACK, Material.SMOOTH_BRICK };
-					ParkourManager.generateNew(p, choose[rand.nextInt(choose.length)]);
-				}
-			}
 		}
 
 		if (it != null && it.getType() != Material.AIR) {
@@ -137,6 +146,7 @@ public class DefaultListener implements Listener {
 				if (event.getAction().name().contains("LEFT_CLICK")) {
 					teleporter.remove(p.getName());
 					teleporter.put(p.getName(), p.getLocation());
+					MCShockwave.send(ChatColor.GREEN, p, "Location %s", "set");
 				} else if (event.getAction().name().contains("RIGHT_CLICK")) {
 					MCShockwave.send(ChatColor.GREEN, p, "%s", "Teleporting...");
 					new BukkitRunnable() {
@@ -157,9 +167,17 @@ public class DefaultListener implements Listener {
 
 				p.getWorld().playSound(p.getLocation(), Sound.FUSE, 10, 0);
 			}
+
+			if (it.getType() == Material.DIAMOND && p.getWorld().getName().equals(GameWorlds.Lobby.w.getName())) {
+				if (p.getLocation().getBlockY() > 64 || p.getLocation().getBlockY() < 0) {
+					Material[] choose = { Material.GRASS, Material.WOOD, Material.COBBLESTONE, Material.LAPIS_BLOCK,
+							Material.WOOL, Material.SNOW_BLOCK, Material.NETHERRACK, Material.SMOOTH_BRICK };
+					ParkourManager.generateNew(p, choose[rand.nextInt(choose.length)]);
+				}
+			}
 		}
 
-		if (GameManager.specs.contains(p.getName()) && it.getType() == Material.FEATHER
+		if (GameManager.specs.contains(p.getName()) && it != null && it.getType() == Material.FEATHER
 				&& event.getAction() != Action.PHYSICAL) {
 			int size = GameManager.getPlayers(false).size();
 			ItemMenu m = new ItemMenu("Teleport to Players", size);
@@ -180,6 +198,150 @@ public class DefaultListener implements Listener {
 		if (it != null && it.getType() == Material.WRITTEN_BOOK && event.getAction().name().contains("RIGHT_CLICK")) {
 			event.setCancelled(false);
 		}
+
+		if (it != null && it.getType() == Material.QUARTZ && event.getAction().name().contains("RIGHT_CLICK")) {
+			for (Block los : p.getLineOfSight(null, 100)) {
+				boolean found = false;
+				for (Corpse c : CorpseManager.corpList) {
+					if (c.ent.getLocation().distanceSquared(los.getLocation()) < 2 * 2) {
+						c.onClick(p);
+						found = true;
+						break;
+					}
+				}
+				if (found) {
+					break;
+				}
+			}
+		}
+
+		if (b != null && b.getType() == Material.SKULL && !GameManager.specs.contains(p.getName())) {
+			if (it != null && it.getType() == Material.FLINT) {
+				b.setType(Material.AIR);
+				p.setItemInHand(null);
+				if (c4Tasks.containsKey(b.getLocation())) {
+					c4Tasks.get(b.getLocation()).cancel();
+					c4Tasks.remove(b.getLocation());
+					c4Wire.remove(b.getLocation());
+				}
+			} else if (c4Tasks.containsKey(b.getLocation())) {
+				ItemMenu m = new ItemMenu("C4", 9);
+
+				for (int i = 0; i < c4Colors.length; i++) {
+					final int id = i;
+					final int idCor = c4Wire.get(b.getLocation());
+					Button w = new Button(true, Material.WOOL, 1, c4Colors[i].getWoolData(), c4ChatColors[i]
+							+ WordUtils.capitalizeFully(c4Colors[i].name()), "Click to cut wire");
+					w.setOnClick(new ButtonRunnable() {
+						public void run(Player p, InventoryClickEvent event) {
+							if (id == idCor) {
+								b.setType(Material.AIR);
+								if (c4Tasks.containsKey(b.getLocation())) {
+									c4Tasks.get(b.getLocation()).cancel();
+									c4Tasks.remove(b.getLocation());
+									c4Wire.remove(b.getLocation());
+								}
+							} else {
+								explodeC4(b.getLocation());
+							}
+						}
+					});
+					m.addButton(w, i * 2);
+				}
+
+				m.open(p);
+			}
+		}
+
+		if (b != null && event.getBlockFace() != null && it != null && p.getItemInHand().getType() == Material.TNT) {
+			p.setItemInHand(null);
+
+			final Block set = b.getRelative(event.getBlockFace());
+			set.setType(Material.SKULL);
+			Skull s = (Skull) set.getState();
+			org.bukkit.material.Skull ms = (org.bukkit.material.Skull) s.getData();
+			ms.setFacingDirection(BlockFace.DOWN);
+			s.setData(ms);
+			s.setRotation(BlockFace.NORTH_WEST);
+			s.setSkullType(SkullType.PLAYER);
+			s.setOwner("MHF_TNT");
+			s.update(true);
+
+			int id = rand.nextInt(c4Colors.length);
+			DyeColor color = c4Colors[id];
+			ChatColor ccolor = c4ChatColors[id];
+			c4Wire.put(set.getLocation(), id);
+			planterWire.remove(p.getName());
+			planterWire.put(p.getName(), id);
+
+			MCShockwave.send(ccolor, p, "The correct wire is %s", WordUtils.capitalizeFully(color.name()));
+
+			c4Tasks.put(set.getLocation(), new BukkitRunnable() {
+				public double	timer		= 45;
+				public double	tickNeeded	= getTime();
+				public double	tick		= 0;
+
+				public void run() {
+					timer -= 0.05;
+					tick += 0.05;
+					if (tick >= tickNeeded) {
+						tick = 0;
+						tickNeeded -= 0.05;
+						set.getWorld().playSound(set.getLocation(), Sound.CLICK, 0.25f, 1.5f);
+						PacketUtils.playBlockParticles(Material.TNT, 0, set.getLocation());
+					}
+
+					if (timer <= 0) {
+						explodeC4(set.getLocation());
+					}
+				}
+
+				public double getTime() {
+					double startTime = timer;
+					double startTickNeeded = 0;
+					double totalTime = 0;
+
+					while (totalTime < startTime) {
+						startTickNeeded += 0.05;
+						totalTime += startTickNeeded;
+					}
+
+					return startTickNeeded;
+				}
+			}.runTaskTimer(TroubleInTerroristTown.ins, 1, 1));
+		}
+	}
+
+	public static final DyeColor[]				c4Colors		= { DyeColor.RED, DyeColor.GREEN, DyeColor.BLUE,
+			DyeColor.YELLOW, DyeColor.WHITE					};
+	public static final ChatColor[]				c4ChatColors	= { ChatColor.RED, ChatColor.GREEN, ChatColor.AQUA,
+			ChatColor.YELLOW, ChatColor.WHITE					};
+	public static HashMap<Location, Integer>	c4Wire			= new HashMap<>();
+	public static HashMap<Location, BukkitTask>	c4Tasks			= new HashMap<>();
+	public static HashMap<String, Integer>		planterWire		= new HashMap<>();
+
+	@SuppressWarnings("deprecation")
+	public static void explodeC4(Location l) {
+		l.getWorld().playSound(l, Sound.EXPLODE, 10, 0);
+		for (Player p : l.getWorld().getPlayers()) {
+			PacketUtils.sendPacket(p, PacketUtils.generateParticles(ParticleEffect.FLAME, l, 0, 2, 1000));
+
+			if (GameManager.specs.contains(p.getName()))
+				continue;
+			if (p.getLocation().distanceSquared(l) < 15 * 15) {
+				p.setLastDamageCause(new EntityDamageEvent(p, DamageCause.BLOCK_EXPLOSION, p.getMaxHealth()));
+				p.damage(p.getMaxHealth() * 20);
+			} else if (p.getLocation().distanceSquared(l) < 25 * 25) {
+				p.setFireTicks((int) ((p.getMaxHealth() * 20) + 30));
+			}
+		}
+
+		l.getBlock().setType(Material.AIR);
+		if (c4Tasks.containsKey(l)) {
+			c4Tasks.get(l).cancel();
+		}
+		c4Tasks.remove(l);
+		c4Wire.remove(l);
 	}
 
 	@EventHandler
@@ -190,36 +352,50 @@ public class DefaultListener implements Listener {
 			i.setPickupDelay(Integer.MAX_VALUE);
 			i.setVelocity(new Vector());
 			new BukkitRunnable() {
+				public int	tick	= 200;
+
 				public void run() {
-					i.getWorld().createExplosion(i.getLocation(), 0);
-					PacketUtils.playParticleEffect(ParticleEffect.FLAME, i.getLocation(), 2, 0.05f, 100);
-					for (Entity e : i.getNearbyEntities(8, 8, 8)) {
-						e.setFireTicks((int) (200 - e.getLocation().distanceSquared(i.getLocation())));
+					tick--;
+					PacketUtils.playParticleEffect(ParticleEffect.FLAME, i.getLocation(), 3, 0.05f, 100);
+					for (Entity e : i.getNearbyEntities(4, 4, 4)) {
+						if (e.getFireTicks() <= 0) {
+							e.setFireTicks(40);
+						}
 					}
 
 					i.remove();
+
+					if (tick <= 0) {
+						cancel();
+					}
 				}
-			}.runTaskLater(TroubleInTerroristTown.ins, 60);
+			}.runTaskTimer(TroubleInTerroristTown.ins, 60, 2);
 		}
 		if (e instanceof Snowball) {
 			final Item i = e.getWorld().dropItem(e.getLocation(), new ItemStack(Material.SNOW_BALL));
 			i.setPickupDelay(Integer.MAX_VALUE);
 			i.setVelocity(new Vector());
 			new BukkitRunnable() {
+				public int	tick	= 200;
+
 				public void run() {
-					i.getWorld().createExplosion(i.getLocation(), 0);
-					PacketUtils.playParticleEffect(ParticleEffect.LARGE_SMOKE, i.getLocation(), 2, 0.05f, 100);
-					for (Entity e : i.getNearbyEntities(10, 10, 10)) {
+					tick--;
+
+					PacketUtils.playParticleEffect(ParticleEffect.LARGE_SMOKE, i.getLocation(), 4, 0.05f, 100);
+					for (Entity e : i.getNearbyEntities(5, 5, 5)) {
 						if (e instanceof LivingEntity) {
 							LivingEntity le = (LivingEntity) e;
-							le.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, (int) (200 - e
-									.getLocation().distanceSquared(i.getLocation())), 0));
+							le.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0));
 						}
 					}
 
 					i.remove();
+
+					if (tick <= 0) {
+						cancel();
+					}
 				}
-			}.runTaskLater(TroubleInTerroristTown.ins, 60);
+			}.runTaskTimer(TroubleInTerroristTown.ins, 60, 2);
 		}
 		if (e instanceof EnderPearl) {
 			final Item i = e.getWorld().dropItem(e.getLocation(), new ItemStack(Material.ENDER_PEARL));
@@ -252,6 +428,7 @@ public class DefaultListener implements Listener {
 		event.blockList().clear();
 		if (event.getEntity() != null && event.getEntityType() == EntityType.PRIMED_TNT
 				&& GameManager.state == GameState.GAME) {
+			ArrayList<Player> bef = new ArrayList<>();
 			ArrayList<Player> aft = new ArrayList<>();
 			for (Entity e : event.getEntity().getNearbyEntities(25, 25, 25)) {
 				if (e instanceof Player) {
@@ -262,11 +439,13 @@ public class DefaultListener implements Listener {
 					if (Role.getRole(p) == Role.Traitor || event.getEntity().getVehicle() != null
 							&& p.equals(event.getEntity().getVehicle())) {
 						aft.add(p);
-						continue;
-					}
-					double distSq = p.getLocation().distanceSquared(event.getLocation());
-					dmgJihad(p, distSq);
+					} else
+						bef.add(p);
 				}
+			}
+			for (Player p : bef) {
+				double distSq = p.getLocation().distanceSquared(event.getLocation());
+				dmgJihad(p, distSq);
 			}
 			for (Player p : aft) {
 				double distSq = p.getLocation().distanceSquared(event.getLocation());
@@ -277,14 +456,12 @@ public class DefaultListener implements Listener {
 
 	@SuppressWarnings("deprecation")
 	public static void dmgJihad(Player p, double distSq) {
-		double dmg = (distSq > 15 * 15) ? (p.getMaxHealth() * 5 / distSq - (15 * 15)) : p.getMaxHealth();
-		double hp = p.getHealth();
-		hp -= dmg;
-		if (hp < 0) {
-			hp = 0;
+		if (distSq < 15 * 15) {
+			p.setLastDamageCause(new EntityDamageEvent(p, DamageCause.BLOCK_EXPLOSION, p.getMaxHealth()));
+			p.damage(p.getMaxHealth() * 20);
+		} else if (distSq < 25 * 25) {
+			p.setFireTicks(250);
 		}
-		p.setLastDamageCause(new EntityDamageEvent(p, DamageCause.BLOCK_EXPLOSION, dmg));
-		p.setHealth(hp);
 	}
 
 	@EventHandler(priority = EventPriority.LOW)
@@ -350,6 +527,8 @@ public class DefaultListener implements Listener {
 			MCShockwave.broadcast("%s cancelled due to lack of players", "Game");
 			GameManager.state = GameState.IDLE;
 		}
+
+		KarmaManager.changeKarmaFor(p.getName(), false);
 	}
 
 	@EventHandler
@@ -402,13 +581,7 @@ public class DefaultListener implements Listener {
 
 		if (CorpseManager.getCorpseFromEntity(e) != null) {
 			Corpse c = CorpseManager.getCorpseFromEntity(e);
-			if (!c.identified && !GameManager.specs.contains(p.getName())) {
-				c.identify(p);
-			}
-			if (Role.getRole(p) == Role.Detective) {
-				c.byDet = true;
-			}
-			c.getMenu().open(p);
+			c.onClick(p);
 			event.setCancelled(true);
 		}
 	}
@@ -428,6 +601,26 @@ public class DefaultListener implements Listener {
 		Entity ee = event.getEntity();
 		Entity de = event.getDamager();
 
+		if (CorpseManager.getCorpseFromEntity(ee) != null && de instanceof Player) {
+			Player d = (Player) de;
+			Corpse c = CorpseManager.getCorpseFromEntity(ee);
+
+			if (Gun.fromItem(d.getItemInHand()) != null && Gun.fromItem(d.getItemInHand()) == Gun.TTT_FLARE_GUN) {
+				Location l = c.ent.getLocation();
+				PacketUtils.playParticleEffect(ParticleEffect.FLAME, l, 0.2f, 0.5f, 50);
+				c.ent.remove();
+			}
+		}
+
+		if (de instanceof Player) {
+			Player d = (Player) de;
+
+			if (Gun.fromItem(d.getItemInHand()) != null && Gun.fromItem(d.getItemInHand()) == Gun.TTT_POLTERGEIST) {
+				event.setCancelled(true);
+				ee.setVelocity(LocUtils.getVelocity(d.getLocation(), ee.getLocation()).multiply(1.5).setY(0.5f));
+			}
+		}
+
 		if (ee instanceof Player && de instanceof Player) {
 			Player p = (Player) ee;
 			final Player d = (Player) de;
@@ -439,6 +632,24 @@ public class DefaultListener implements Listener {
 
 			if (d.getItemInHand() != null && d.getItemInHand().getType() != Material.AIR) {
 				ItemStack it = d.getItemInHand();
+				if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_GOLDEN_GUN) {
+					if (Role.getRole(p) == Role.Traitor) {
+						d.sendMessage("§aSuccess! Target was a traitor!");
+						event.setDamage(p.getMaxHealth() * 10);
+					} else {
+						d.sendMessage("§cFailure! Target was innocent!");
+						d.damage(d.getMaxHealth() * 10);
+					}
+				}
+				if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_UMP) {
+					p.addPotionEffect(new PotionEffect(PotionEffectType.CONFUSION, 100, 0));
+				}
+				if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_POISON_GUN) {
+					p.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, Integer.MAX_VALUE, 0));
+				}
+				if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_FLARE_GUN) {
+					p.setFireTicks((int) (p.getMaxHealth() * 30));
+				}
 				if (it.getType() == Material.GOLD_SWORD) {
 					event.setDamage(p.getMaxHealth() * 10);
 					new BukkitRunnable() {
@@ -449,6 +660,34 @@ public class DefaultListener implements Listener {
 				}
 			} else {
 				event.setDamage(0);
+			}
+
+			if (GameManager.state == GameState.GAME) {
+				Role pr = Role.getRole(p);
+				Role dr = Role.getRole(d);
+
+				int dmg = (int) (event.getDamage() > p.getHealth() ? p.getHealth() : event.getDamage());
+				if (dr != Role.Traitor) {
+					if (pr == Role.Traitor) {
+						KarmaManager.addKarma(d.getName(), dmg * 3);
+					}
+					if (pr == Role.Innocent) {
+						KarmaManager.addKarma(d.getName(), dmg * -2);
+					}
+					if (pr == Role.Detective) {
+						KarmaManager.addKarma(d.getName(), dmg * -3);
+					}
+				} else {
+					if (pr == Role.Traitor) {
+						KarmaManager.addKarma(d.getName(), dmg * -4);
+					}
+					if (pr == Role.Innocent) {
+						KarmaManager.addKarma(d.getName(), dmg * 2);
+					}
+					if (pr == Role.Detective) {
+						KarmaManager.addKarma(d.getName(), dmg * 3);
+					}
+				}
 			}
 		}
 	}
@@ -529,18 +768,21 @@ public class DefaultListener implements Listener {
 	public void onPlayerDeath(PlayerDeathEvent event) {
 		final Player p = event.getEntity();
 
+		Location dl = p.getLocation();
+
 		event.setKeepInventory(true);
 		event.setKeepLevel(true);
-
-		if (GameManager.state == GameState.GAME) {
-			GameManager.spectate(p, false);
-		}
 
 		event.setDeathMessage("");
 
 		boolean isSpec = GameManager.specs.contains(p.getName());
 
-		GameManager.onDeath(p, event);
+		if (GameManager.state == GameState.GAME) {
+			GameManager.onDeath(p, event);
+		}
+		if (GameManager.state == GameState.GAME && !GameManager.specs.contains(p.getName())) {
+			GameManager.spectate(p, false);
+		}
 
 		boolean becameSpec = GameManager.specs.contains(p.getName()) && !isSpec;
 
@@ -548,11 +790,15 @@ public class DefaultListener implements Listener {
 		Bukkit.getPluginManager().callEvent(pre);
 		p.setMaxHealth(20);
 		p.setHealth(p.getMaxHealth());
-		p.teleport(becameSpec ? p.getLocation() : pre.getRespawnLocation());
+		p.teleport(becameSpec ? dl : pre.getRespawnLocation());
 		new BukkitRunnable() {
 			public void run() {
 				p.setVelocity(new Vector());
 				p.setFireTicks(0);
+				PlayerUtils.clearEffects(p);
+				if (GameManager.specs.contains(p.getName())) {
+					p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0));
+				}
 			}
 		}.runTaskLater(TroubleInTerroristTown.ins, 1);
 	}

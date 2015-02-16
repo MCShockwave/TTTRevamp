@@ -238,6 +238,7 @@ public class GameManager {
 			p.teleport(spawns.get(rand.nextInt(spawns.size())).clone().add(0, 1, 0));
 			registerScoreboards();
 			basicKit(p);
+			p.setLevel(0);
 		}
 
 		ArrayList<Location> guns = FileElements.getAll("gun-spawn", GameWorlds.getGameWorld());
@@ -288,6 +289,8 @@ public class GameManager {
 
 		time = 0;
 
+		DefaultListener.planterWire.clear();
+
 		Role.generate();
 
 		updatePlayerLists();
@@ -317,6 +320,9 @@ public class GameManager {
 			public void run() {
 				time++;
 				updateScoreboards();
+				if (time > 600) {
+					stop(Role.Innocent);
+				}
 			}
 		}.runTaskTimer(TroubleInTerroristTown.ins, 20, 20);
 	}
@@ -353,11 +359,18 @@ public class GameManager {
 		return ret;
 	}
 
-	public static void stop(final String winner) {
+	public static void stop(final Role winner) {
 		state = GameState.END;
+
+		if (winner != null) {
+			MCShockwave.broadcast(winner.color, "%s win!", winner.name() + "s");
+		} else {
+			MCShockwave.broadcast("Game %s!", "ended");
+		}
 
 		specs.clear();
 		innoSlay.clear();
+		kills.clear();
 
 		if (roundTimer != null) {
 			roundTimer.cancel();
@@ -366,7 +379,6 @@ public class GameManager {
 		CorpseManager.corpses.clear();
 		CorpseManager.corpList.clear();
 
-		MCShockwave.broadcast("Game %s!", "ended");
 		if (Role.Traitor.all.size() > 0) {
 			int si = Role.Traitor.all.size();
 			String ts = "";
@@ -380,6 +392,7 @@ public class GameManager {
 
 		DefaultListener.healerHealth.clear();
 		DefaultListener.teleporter.clear();
+		DefaultListener.planterWire.clear();
 
 		ShopManager.credits.clear();
 
@@ -392,11 +405,18 @@ public class GameManager {
 
 		GameWorlds.generateLobby(GameWorlds.Lobby.w);
 
+		for (Player p : getPlayers(true)) {
+			KarmaManager.changeKarmaFor(p.getName(), true);
+		}
+
 		count = SchedulerUtils.getNew();
 		count.add(60);
 		count.add(new Runnable() {
 			public void run() {
 				for (Player p : getPlayers()) {
+					if (p.getPassenger() != null) {
+						p.setPassenger(null);
+					}
 					p.teleport(GameWorlds.Lobby.w.getSpawnLocation());
 					p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
 					PlayerUtils.resetPlayer(p);
@@ -453,14 +473,24 @@ public class GameManager {
 		p.setAllowFlight(true);
 	}
 
-	public static final int					innocentSlayLimit	= 3;
+	public static final int								innocentSlayLimit	= 3;
 
-	public static HashMap<String, Integer>	innoSlay			= new HashMap<>();
+	public static HashMap<String, Integer>				innoSlay			= new HashMap<>();
+
+	public static HashMap<String, ArrayList<String>>	kills				= new HashMap<>();
 
 	public static void onDeath(Player p, PlayerDeathEvent event) {
 		p.getWorld().playSound(p.getLocation(), Sound.GHAST_SCREAM, 2, 1);
 
 		Role r = Role.getRole(p);
+
+		if (p.getKiller() != null) {
+			String kn = p.getKiller().getName();
+			if (!kills.containsKey(kn)) {
+				kills.put(kn, new ArrayList<String>());
+			}
+			kills.get(kn).add(p.getName());
+		}
 
 		if (r != null) {
 			r.players.remove(p.getName());
@@ -523,11 +553,9 @@ public class GameManager {
 
 		if (state == GameState.GAME) {
 			if (Role.Traitor.getPlayers().size() == 0) {
-				MCShockwave.broadcast(Role.Innocent.color, "%s win!", "Innocents");
-				stop("Innocents");
+				stop(Role.Innocent);
 			} else if (Role.Detective.getPlayers().size() == 0 && Role.Innocent.getPlayers().size() == 0) {
-				MCShockwave.broadcast(Role.Traitor.color, "%s win!", "Traitors");
-				stop("Traitors");
+				stop(Role.Traitor);
 			}
 		}
 
@@ -538,6 +566,8 @@ public class GameManager {
 	public static void lobbyKit(Player p) {
 		PlayerUtils.clearInv(p);
 		p.getInventory().setItem(8, InfoBook.getBookItem());
+		p.getInventory().setItem(7, ItemMetaUtils.setItemName(new ItemStack(Material.DIAMOND), "§bClick for parkour"));
+		p.setLevel(KarmaManager.getKarma(p.getName()));
 	}
 
 	public static void updatePlayerLists() {

@@ -32,9 +32,10 @@ public class ShopManager {
 	public static ItemMenu getMenu(Player p, boolean isTraitor) {
 		int size = 9;
 		ItemMenu m = new ItemMenu("Shop - " + (isTraitor ? "Traitor" : "Detective"), size);
-		int id = 0;
+		int id = -1;
 		if (isTraitor) {
 			for (final TraitorShop ts : TraitorShop.values()) {
+				id++;
 				if (ts.timesBought.containsKey(p.getName()) && ts.timesBought.get(p.getName()) >= ts.limit) {
 					continue;
 				}
@@ -57,10 +58,11 @@ public class ShopManager {
 						ts.timesBought.put(p.getName(), ++tb);
 					}
 				});
-				m.addButton(b, id++);
+				m.addButton(b, id);
 			}
 		} else {
 			for (final DetectiveShop ds : DetectiveShop.values()) {
+				id++;
 				if (ds.timesBought.containsKey(p.getName()) && ds.timesBought.get(p.getName()) >= ds.limit) {
 					continue;
 				}
@@ -83,7 +85,7 @@ public class ShopManager {
 						ds.timesBought.put(p.getName(), ++tb);
 					}
 				});
-				m.addButton(b, id++);
+				m.addButton(b, id);
 			}
 		}
 		Button cre = new Button(false, Material.GOLD_INGOT, credits.get(p.getName()), 0, "§6Credits",

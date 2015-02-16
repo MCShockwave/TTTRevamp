@@ -1,5 +1,6 @@
 package net.mcshockwave.ttt.shop;
 
+import net.mcshockwave.Guns.Gun;
 import net.mcshockwave.MCS.Utils.ItemMetaUtils;
 
 import org.bukkit.Material;
@@ -30,7 +31,43 @@ public enum DetectiveShop {
 		1,
 		"Left click to set a waypoint,",
 		"Right click to go to that waypoint.",
-		"Unlimited uses. 3 second chargeup.");
+		"Unlimited uses. 3 second chargeup."),
+	Binoculars(
+		"Binoculars",
+		Material.QUARTZ,
+		1,
+		0,
+		1,
+		1,
+		"Right click a body from a distance to",
+		"inspect it."),
+	Golden_Gun(
+		"Golden Gun",
+		Material.GOLD_AXE,
+		1,
+		0,
+		2,
+		1,
+		"Shoot at a player to instantly kill them",
+		"if they are a traitor. If they are innocent,",
+		"you die."),
+	UMP_Prototype(
+		"UMP Prototype",
+		Material.STONE_HOE,
+		1,
+		0,
+		2,
+		1,
+		"A gun similar to the Mac10, but gives nausea",
+		"when you hit someone."),
+	Wire_Cutters(
+		"Wire Cutters",
+		Material.FLINT,
+		1,
+		0,
+		1,
+		3,
+		"Disarm a C4 instantly and safely by right-clicking.");
 
 	public String					display, desc[];
 	public int						cost;
@@ -66,6 +103,18 @@ public enum DetectiveShop {
 		}
 		if (this == Teleporter) {
 			p.getInventory().addItem(ItemMetaUtils.setItemName(new ItemStack(Material.CLAY_BALL), "§6Teleporter"));
+		}
+		if (this == Binoculars) {
+			p.getInventory().addItem(ItemMetaUtils.setItemName(new ItemStack(Material.QUARTZ), "§6Binoculars"));
+		}
+		if (this == Golden_Gun) {
+			p.getInventory().addItem(Gun.TTT_GOLDEN_GUN.getItem());
+		}
+		if (this == UMP_Prototype) {
+			p.getInventory().addItem(Gun.TTT_UMP.getItem());
+		}
+		if (this == Wire_Cutters) {
+			p.getInventory().addItem(ItemMetaUtils.setItemName(new ItemStack(Material.FLINT), "§6Wire Cutters"));
 		}
 	}
 

@@ -15,8 +15,6 @@ import org.bukkit.World.Environment;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
-import org.bukkit.block.Sign;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
@@ -266,17 +264,6 @@ public enum GameWorlds {
 				}
 			}
 		}
-
-		Block psign = w.getBlockAt(0, yval + 3, rad - 1);
-		psign.setType(Material.WALL_SIGN);
-		org.bukkit.material.Sign data = (org.bukkit.material.Sign) psign.getState().getData();
-		data.setFacingDirection(BlockFace.NORTH);
-
-		Sign s = (Sign) psign.getState();
-		s.setLine(0, "[Parkour]");
-		s.setLine(2, "Click to go");
-		s.setLine(3, "to parkour");
-		s.update();
 
 		if (lobbyAnimation != null) {
 			lobbyAnimation.cancel();
