@@ -22,7 +22,9 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Hanging;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -41,6 +43,7 @@ import org.bukkit.util.Vector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map.Entry;
 import java.util.Random;
 
 import org.apache.commons.lang.WordUtils;
@@ -65,10 +68,16 @@ public class GameManager {
 		}.runTaskLater(TroubleInTerroristTown.ins, 60);
 	}
 
-	public static SchedulerUtils	count		= null;
-	public static BukkitTask		roundTimer	= null;
+	public static SchedulerUtils			count		= null;
+	public static BukkitTask				roundTimer	= null;
 
-	public static GameMap			map			= null;
+	public static GameMap					map			= null;
+
+	public static HashMap<GameMap, Integer>	votes		= new HashMap<>();
+	public static ArrayList<String>			voted		= new ArrayList<>();
+	public static boolean					voting		= false;
+
+	public static ArrayList<GameMap>		recent		= new ArrayList<>();
 
 	public static void startCount() {
 		state = GameState.LOBBY;
@@ -78,18 +87,77 @@ public class GameManager {
 		}
 
 		count = SchedulerUtils.getNew();
-		int[] broad = { 45, 30, 15, 10, 5, 4, 3, 2, 1 };
+		int[] broad = { 45, 40, 30, 15, 10, 5, 4, 3, 2, 1 };
 		for (int i = 0; i < broad.length; i++) {
 			final int time = broad[i];
 			count.add(new Runnable() {
 				public void run() {
 					MCShockwave.broadcast("Game starting in %s second" + (time == 1 ? "" : "s"), time);
 
+					if (time == 45) {
+						votes.clear();
+						int tries = 0;
+						do {
+							boolean addMap = true;
+							GameMap r = GameWorlds.mapList.get(rand.nextInt(GameWorlds.mapList.size()));
+							for (GameMap m : votes.keySet()) {
+								if (m.name.equals(r)) {
+									addMap = false;
+								}
+							}
+							if (recent.contains(r) && tries < 50) {
+								addMap = false;
+							}
+							if (addMap) {
+								votes.put(r, 0);
+								tries = 0;
+							}
+							tries++;
+						} while (votes.size() < 3 && tries < 500);
+					}
+
+					if (time == 40) {
+						voting = true;
+						for (Player p : getPlayers()) {
+							lobbyKit(p);
+						}
+						voted.clear();
+						MCShockwave.broadcast("Map %s has started!", "voting");
+						int c = 0;
+						for (GameMap m : votes.keySet()) {
+							MCShockwave.broadcast(++c + ". %s", m.name);
+						}
+						MCShockwave.broadcast("Vote by clicking the %s in your inventory!", "emerald");
+					}
+
 					if (time == 15) {
-						map = GameWorlds.mapList.get(rand.nextInt(GameWorlds.mapList.size()));
+						int maxVotes = -1;
+						ArrayList<GameMap> winMaps = new ArrayList<>();
+						for (Entry<GameMap, Integer> v : votes.entrySet()) {
+							if (v.getValue() > maxVotes) {
+								winMaps.clear();
+								winMaps.add(v.getKey());
+								maxVotes = v.getValue();
+							} else if (v.getValue() == maxVotes) {
+								winMaps.add(v.getKey());
+							}
+						}
+
+						map = winMaps.get(rand.nextInt(winMaps.size()));
+
 						GameWorlds.addWorld(map.world);
 
 						MCShockwave.broadcast("Map Chosen: %s by %s", map.name, map.author);
+
+						voting = false;
+						for (Player p : getPlayers()) {
+							lobbyKit(p);
+						}
+
+						if (recent.size() >= 2) {
+							recent.remove(0);
+						}
+						recent.add(map);
 					}
 
 					if (time == 10) {
@@ -316,11 +384,12 @@ public class GameManager {
 
 		registerScoreboards();
 
+		time = 600;
 		roundTimer = new BukkitRunnable() {
 			public void run() {
-				time++;
+				time--;
 				updateScoreboards();
-				if (time > 600) {
+				if (time <= 0) {
 					stop(Role.Innocent);
 				}
 			}
@@ -407,6 +476,12 @@ public class GameManager {
 
 		for (Player p : getPlayers(true)) {
 			KarmaManager.changeKarmaFor(p.getName(), true);
+		}
+
+		for (Entity e : GameWorlds.getGameWorld().getEntities()) {
+			if (!(e instanceof Hanging) && !(e instanceof Player)) {
+				e.remove();
+			}
 		}
 
 		count = SchedulerUtils.getNew();
@@ -567,6 +642,9 @@ public class GameManager {
 		PlayerUtils.clearInv(p);
 		p.getInventory().setItem(8, InfoBook.getBookItem());
 		p.getInventory().setItem(7, ItemMetaUtils.setItemName(new ItemStack(Material.DIAMOND), "§bClick for parkour"));
+		if (voting) {
+			p.getInventory().setItem(6, ItemMetaUtils.setItemName(new ItemStack(Material.EMERALD), "§aVote for maps"));
+		}
 		p.setLevel(KarmaManager.getKarma(p.getName()));
 	}
 

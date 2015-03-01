@@ -1,6 +1,7 @@
 package net.mcshockwave.ttt;
 
 import net.mcshockwave.ttt.GameManager.GameState;
+import net.mcshockwave.ttt.commands.KarmaCommand;
 import net.mcshockwave.ttt.commands.TTTCommand;
 import net.mcshockwave.ttt.utils.ParkourManager;
 
@@ -23,6 +24,7 @@ public class TroubleInTerroristTown extends JavaPlugin {
 		GameManager.enable();
 
 		getCommand("ttt").setExecutor(new TTTCommand());
+		getCommand("karma").setExecutor(new KarmaCommand());
 
 		if (Bukkit.getOnlinePlayers().size() >= GameManager.minPlayers) {
 			GameManager.state = GameState.LOBBY;

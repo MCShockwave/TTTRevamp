@@ -5,6 +5,7 @@ import net.mcshockwave.MCS.Menu.ItemMenu;
 import net.mcshockwave.MCS.Menu.ItemMenu.Button;
 import net.mcshockwave.ttt.utils.DamageCauseInfo;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -114,6 +115,9 @@ public class CorpseManager {
 			identified = true;
 			MCShockwave.broadcast(getRole().color, "%s has identified the body of %s! They were "
 					+ getRole().getArticle() + " %s!", "§6§o" + id.getName(), name, getRole().name());
+			if (Bukkit.getPlayer(name) != null) {
+				GameManager.spectate(Bukkit.getPlayer(name), true);
+			}
 			GameManager.updatePlayerLists();
 		}
 

@@ -12,6 +12,7 @@ import net.mcshockwave.MCS.Utils.PacketUtils;
 import net.mcshockwave.MCS.Utils.PacketUtils.ParticleEffect;
 import net.mcshockwave.ttt.CorpseManager.Corpse;
 import net.mcshockwave.ttt.GameManager.GameState;
+import net.mcshockwave.ttt.GameWorlds.GameMap;
 import net.mcshockwave.ttt.manage.FileElements;
 import net.mcshockwave.ttt.shop.ShopManager;
 import net.mcshockwave.ttt.utils.ParkourManager;
@@ -46,6 +47,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -85,6 +87,7 @@ import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map.Entry;
 import java.util.Random;
 
 import org.apache.commons.lang.WordUtils;
@@ -103,7 +106,7 @@ public class DefaultListener implements Listener {
 
 	@EventHandler
 	public void onPlayerJoin(PlayerJoinEvent event) {
-		Player p = event.getPlayer();
+		final Player p = event.getPlayer();
 
 		if (GameManager.state == GameState.IDLE && GameManager.getPlayers().size() >= GameManager.minPlayers) {
 			MCShockwave.broadcast("%s has reached minimum player count!", "Game");
@@ -124,6 +127,12 @@ public class DefaultListener implements Listener {
 		} else if (GameManager.state == GameState.LOBBY || GameManager.state == GameState.IDLE) {
 			GameManager.lobbyKit(p);
 		}
+
+		new BukkitRunnable() {
+			public void run() {
+				p.setResourcePack("http://packs.mcsw.us/MCS_TTT_Pack.zip");
+			}
+		}.runTaskLater(TroubleInTerroristTown.ins, 10);
 	}
 
 	public static HashMap<String, Location>	teleporter	= new HashMap<>();
@@ -253,6 +262,33 @@ public class DefaultListener implements Listener {
 			}
 		}
 
+		if (it != null && it.getType() == Material.EMERALD && GameManager.voting) {
+			ItemMenu v = new ItemMenu("Voting", GameManager.votes.size());
+
+			int id = 0;
+			for (Entry<GameMap, Integer> votes : GameManager.votes.entrySet()) {
+				final GameMap voteFor = votes.getKey();
+				Button m = new Button(true, Material.EMERALD, votes.getValue(), 0, "§6" + voteFor.name, "§7By: §3"
+						+ voteFor.author);
+				m.setOnClick(new ButtonRunnable() {
+					public void run(Player p, InventoryClickEvent event) {
+						if (!GameManager.voted.contains(p.getName())) {
+							int votes = GameManager.votes.get(voteFor);
+							GameManager.votes.remove(voteFor);
+							GameManager.votes.put(voteFor, ++votes);
+							MCShockwave.send(p, "You voted for %s!", voteFor.name);
+							GameManager.voted.add(p.getName());
+						} else {
+							MCShockwave.send(ChatColor.RED, p, "You already %s!", "voted");
+						}
+					}
+				});
+				v.addButton(m, id++);
+			}
+
+			v.open(p);
+		}
+
 		if (b != null && event.getBlockFace() != null && it != null && p.getItemInHand().getType() == Material.TNT) {
 			p.setItemInHand(null);
 
@@ -277,17 +313,17 @@ public class DefaultListener implements Listener {
 			MCShockwave.send(ccolor, p, "The correct wire is %s", WordUtils.capitalizeFully(color.name()));
 
 			c4Tasks.put(set.getLocation(), new BukkitRunnable() {
-				public double	timer		= 45;
-				public double	tickNeeded	= getTime();
-				public double	tick		= 0;
+				public int	timer		= 45 * 20;
+				public int	tickNeeded	= getTime();
+				public int	tick		= 0;
 
 				public void run() {
-					timer -= 0.05;
-					tick += 0.05;
+					timer -= 1;
+					tick += 1;
 					if (tick >= tickNeeded) {
 						tick = 0;
-						tickNeeded -= 0.05;
-						set.getWorld().playSound(set.getLocation(), Sound.CLICK, 0.25f, 1.5f);
+						tickNeeded -= 1;
+						set.getWorld().playSound(set.getLocation(), Sound.CLICK, 0.3f, 1.5f);
 						PacketUtils.playBlockParticles(Material.TNT, 0, set.getLocation());
 					}
 
@@ -296,13 +332,12 @@ public class DefaultListener implements Listener {
 					}
 				}
 
-				public double getTime() {
-					double startTime = timer;
-					double startTickNeeded = 0;
-					double totalTime = 0;
+				public int getTime() {
+					int startTickNeeded = 0;
+					int totalTime = 0;
 
-					while (totalTime < startTime) {
-						startTickNeeded += 0.05;
+					while (totalTime < timer) {
+						startTickNeeded += 1;
 						totalTime += startTickNeeded;
 					}
 
@@ -345,6 +380,13 @@ public class DefaultListener implements Listener {
 	}
 
 	@EventHandler
+	public void onBlockFromTo(BlockFromToEvent event) {
+		if (event.getBlock().getType().name().contains("WATER") && event.getToBlock().getType() == Material.SKULL) {
+			event.setCancelled(true);
+		}
+	}
+
+	@EventHandler
 	public void onProjectileHit(final ProjectileHitEvent event) {
 		final Projectile e = event.getEntity();
 		if (e instanceof Egg) {
@@ -357,7 +399,7 @@ public class DefaultListener implements Listener {
 				public void run() {
 					tick--;
 					PacketUtils.playParticleEffect(ParticleEffect.FLAME, i.getLocation(), 3, 0.05f, 100);
-					for (Entity e : i.getNearbyEntities(4, 4, 4)) {
+					for (Entity e : i.getNearbyEntities(6, 6, 6)) {
 						if (e.getFireTicks() <= 0) {
 							e.setFireTicks(40);
 						}
@@ -382,7 +424,7 @@ public class DefaultListener implements Listener {
 					tick--;
 
 					PacketUtils.playParticleEffect(ParticleEffect.LARGE_SMOKE, i.getLocation(), 4, 0.05f, 100);
-					for (Entity e : i.getNearbyEntities(5, 5, 5)) {
+					for (Entity e : i.getNearbyEntities(8, 8, 8)) {
 						if (e instanceof LivingEntity) {
 							LivingEntity le = (LivingEntity) e;
 							le.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0));
@@ -430,7 +472,7 @@ public class DefaultListener implements Listener {
 				&& GameManager.state == GameState.GAME) {
 			ArrayList<Player> bef = new ArrayList<>();
 			ArrayList<Player> aft = new ArrayList<>();
-			for (Entity e : event.getEntity().getNearbyEntities(25, 25, 25)) {
+			for (Entity e : event.getEntity().getNearbyEntities(30, 30, 30)) {
 				if (e instanceof Player) {
 					Player p = (Player) e;
 					if (GameManager.specs.contains(p.getName())) {
@@ -456,10 +498,10 @@ public class DefaultListener implements Listener {
 
 	@SuppressWarnings("deprecation")
 	public static void dmgJihad(Player p, double distSq) {
-		if (distSq < 15 * 15) {
+		if (distSq < 20 * 20) {
 			p.setLastDamageCause(new EntityDamageEvent(p, DamageCause.BLOCK_EXPLOSION, p.getMaxHealth()));
 			p.damage(p.getMaxHealth() * 20);
-		} else if (distSq < 25 * 25) {
+		} else if (distSq < 30 * 30) {
 			p.setFireTicks(250);
 		}
 	}
@@ -572,6 +614,20 @@ public class DefaultListener implements Listener {
 			event.setCancelled(true);
 			ee.setFireTicks(0);
 		}
+
+		if (GameManager.state == GameState.GAME && !(ee instanceof EntityDamageByEntityEvent) && !event.isCancelled()
+				&& event.getDamage() >= 1) {
+			int spawn = (int) (event.getDamage() / 2);
+			if (spawn > 10) {
+				spawn = 10;
+			}
+
+			for (int i = 0; i < spawn; i++) {
+				Item it = ee.getWorld().dropItemNaturally(ee.getLocation(),
+						ItemMetaUtils.setItemName(new ItemStack(Material.REDSTONE), rand.nextInt(5) + ""));
+				it.setPickupDelay(Integer.MAX_VALUE);
+			}
+		}
 	}
 
 	@EventHandler
@@ -605,7 +661,8 @@ public class DefaultListener implements Listener {
 			Player d = (Player) de;
 			Corpse c = CorpseManager.getCorpseFromEntity(ee);
 
-			if (Gun.fromItem(d.getItemInHand()) != null && Gun.fromItem(d.getItemInHand()) == Gun.TTT_FLARE_GUN) {
+			if (d.getItemInHand() != null && Gun.fromItem(d.getItemInHand()) != null
+					&& Gun.fromItem(d.getItemInHand()) == Gun.TTT_FLARE_GUN) {
 				Location l = c.ent.getLocation();
 				PacketUtils.playParticleEffect(ParticleEffect.FLAME, l, 0.2f, 0.5f, 50);
 				c.ent.remove();
@@ -615,7 +672,8 @@ public class DefaultListener implements Listener {
 		if (de instanceof Player) {
 			Player d = (Player) de;
 
-			if (Gun.fromItem(d.getItemInHand()) != null && Gun.fromItem(d.getItemInHand()) == Gun.TTT_POLTERGEIST) {
+			if (d.getItemInHand() != null && Gun.fromItem(d.getItemInHand()) != null
+					&& Gun.fromItem(d.getItemInHand()) == Gun.TTT_POLTERGEIST) {
 				event.setCancelled(true);
 				ee.setVelocity(LocUtils.getVelocity(d.getLocation(), ee.getLocation()).multiply(1.5).setY(0.5f));
 			}
@@ -625,68 +683,83 @@ public class DefaultListener implements Listener {
 			Player p = (Player) ee;
 			final Player d = (Player) de;
 
-			if (GameManager.specs.contains(d.getName()) || GameManager.specs.contains(p.getName())) {
-				event.setCancelled(true);
-				return;
-			}
-
-			if (d.getItemInHand() != null && d.getItemInHand().getType() != Material.AIR) {
-				ItemStack it = d.getItemInHand();
-				if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_GOLDEN_GUN) {
-					if (Role.getRole(p) == Role.Traitor) {
-						d.sendMessage("§aSuccess! Target was a traitor!");
-						event.setDamage(p.getMaxHealth() * 10);
-					} else {
-						d.sendMessage("§cFailure! Target was innocent!");
-						d.damage(d.getMaxHealth() * 10);
-					}
-				}
-				if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_UMP) {
-					p.addPotionEffect(new PotionEffect(PotionEffectType.CONFUSION, 100, 0));
-				}
-				if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_POISON_GUN) {
-					p.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, Integer.MAX_VALUE, 0));
-				}
-				if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_FLARE_GUN) {
-					p.setFireTicks((int) (p.getMaxHealth() * 30));
-				}
-				if (it.getType() == Material.GOLD_SWORD) {
-					event.setDamage(p.getMaxHealth() * 10);
-					new BukkitRunnable() {
-						public void run() {
-							d.setItemInHand(null);
+			if (!GameManager.specs.contains(d.getName()) && !GameManager.specs.contains(p.getName())) {
+				if (d.getItemInHand() != null && d.getItemInHand().getType() != Material.AIR) {
+					ItemStack it = d.getItemInHand();
+					if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_GOLDEN_GUN) {
+						if (Role.getRole(p) == Role.Traitor) {
+							d.sendMessage("§aSuccess! Target was a traitor!");
+							event.setDamage(p.getMaxHealth() * 10);
+						} else {
+							d.sendMessage("§cFailure! Target was innocent!");
+							d.damage(d.getMaxHealth() * 10);
 						}
-					}.runTaskLater(TroubleInTerroristTown.ins, 1);
-				}
-			} else {
-				event.setDamage(0);
-			}
-
-			if (GameManager.state == GameState.GAME) {
-				Role pr = Role.getRole(p);
-				Role dr = Role.getRole(d);
-
-				int dmg = (int) (event.getDamage() > p.getHealth() ? p.getHealth() : event.getDamage());
-				if (dr != Role.Traitor) {
-					if (pr == Role.Traitor) {
-						KarmaManager.addKarma(d.getName(), dmg * 3);
 					}
-					if (pr == Role.Innocent) {
-						KarmaManager.addKarma(d.getName(), dmg * -2);
+					if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_UMP) {
+						p.addPotionEffect(new PotionEffect(PotionEffectType.CONFUSION, 100, 0));
 					}
-					if (pr == Role.Detective) {
-						KarmaManager.addKarma(d.getName(), dmg * -3);
+					if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_POISON_GUN) {
+						p.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, Integer.MAX_VALUE, 0));
+					}
+					if (Gun.fromItem(it) != null && Gun.fromItem(it) == Gun.TTT_FLARE_GUN) {
+						p.setFireTicks((int) (p.getMaxHealth() * 30));
+					}
+					if (it.getType() == Material.GOLD_SWORD) {
+						event.setDamage(p.getMaxHealth() * 10);
+						new BukkitRunnable() {
+							public void run() {
+								d.setItemInHand(null);
+							}
+						}.runTaskLater(TroubleInTerroristTown.ins, 1);
 					}
 				} else {
-					if (pr == Role.Traitor) {
-						KarmaManager.addKarma(d.getName(), dmg * -4);
+					event.setDamage(0);
+				}
+
+				if (GameManager.state == GameState.GAME) {
+					Role pr = Role.getRole(p);
+					Role dr = Role.getRole(d);
+
+					int dmg = (int) (event.getDamage() > p.getHealth() ? p.getHealth() : event.getDamage() < 0 ? 0
+							: event.getDamage());
+					if (dmg > 0) {
+						if (dr != Role.Traitor) {
+							if (pr == Role.Traitor) {
+								KarmaManager.addKarma(d.getName(), dmg * 2, pr);
+							}
+							if (pr == Role.Innocent) {
+								KarmaManager.addKarma(d.getName(), dmg * -2, pr);
+							}
+							if (pr == Role.Detective) {
+								KarmaManager.addKarma(d.getName(), dmg * -4, pr);
+							}
+						} else {
+							if (pr == Role.Traitor) {
+								KarmaManager.addKarma(d.getName(), dmg * -4, pr);
+							}
+							if (pr == Role.Innocent) {
+								KarmaManager.addKarma(d.getName(), dmg * 1, pr);
+							}
+							if (pr == Role.Detective) {
+								KarmaManager.addKarma(d.getName(), dmg * 2, pr);
+							}
+						}
 					}
-					if (pr == Role.Innocent) {
-						KarmaManager.addKarma(d.getName(), dmg * 2);
-					}
-					if (pr == Role.Detective) {
-						KarmaManager.addKarma(d.getName(), dmg * 3);
-					}
+				}
+			} else {
+				event.setCancelled(true);
+			}
+
+			if (GameManager.state == GameState.GAME && !event.isCancelled() && event.getDamage() >= 1) {
+				int spawn = (int) (event.getDamage() / 2);
+				if (spawn > 10) {
+					spawn = 10;
+				}
+
+				for (int i = 0; i < spawn; i++) {
+					Item it = p.getWorld().dropItemNaturally(p.getEyeLocation(),
+							ItemMetaUtils.setItemName(new ItemStack(Material.REDSTONE), rand.nextInt(5) + ""));
+					it.setPickupDelay(Integer.MAX_VALUE);
 				}
 			}
 		}
@@ -752,7 +825,7 @@ public class DefaultListener implements Listener {
 	public void onPlayerDropItem(PlayerDropItemEvent event) {
 		Material m = event.getItemDrop().getItemStack().getType();
 		Material[] disabled = { Material.IRON_SWORD, Material.PAPER, Material.GOLD_INGOT, Material.WRITTEN_BOOK,
-				Material.FEATHER };
+				Material.FEATHER, Material.DIAMOND, Material.EMERALD };
 		for (Material mc : disabled) {
 			if (m == mc)
 				event.setCancelled(true);
@@ -829,7 +902,8 @@ public class DefaultListener implements Listener {
 					Gun cg = Gun.fromItem(con);
 					if (g.type == GunType.PISTOL && cg.type == GunType.PISTOL) {
 						event.setCancelled(true);
-					} else if (g.type != GunType.PISTOL && cg.type != GunType.PISTOL) {
+					} else if (g.type != GunType.PISTOL && cg.type != GunType.PISTOL && g.type != GunType.SPECIAL
+							&& cg.type != GunType.SPECIAL) {
 						event.setCancelled(true);
 					}
 				}

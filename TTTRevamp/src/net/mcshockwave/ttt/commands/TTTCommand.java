@@ -4,9 +4,10 @@ import net.mcshockwave.MCS.MCShockwave;
 import net.mcshockwave.MCS.SQLTable;
 import net.mcshockwave.MCS.SQLTable.Rank;
 import net.mcshockwave.ttt.GameManager;
-import net.mcshockwave.ttt.GameWorlds;
 import net.mcshockwave.ttt.GameManager.GameState;
+import net.mcshockwave.ttt.GameWorlds;
 import net.mcshockwave.ttt.GameWorlds.GameMap;
+import net.mcshockwave.ttt.KarmaManager;
 import net.mcshockwave.ttt.utils.ParkourManager;
 
 import org.bukkit.Bukkit;
@@ -17,6 +18,8 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+
+import java.util.concurrent.TimeUnit;
 
 public class TTTCommand implements CommandExecutor {
 
@@ -97,15 +100,30 @@ public class TTTCommand implements CommandExecutor {
 				ParkourManager.generateNew(p, args.length > 1 ? Material.valueOf(args[1].toUpperCase())
 						: Material.QUARTZ_BLOCK);
 			}
-			
+
 			if (args[0].equalsIgnoreCase("fixhealth")) {
 				Player t = Bukkit.getPlayer(args[1]);
 				t.setMaxHealth(20);
 				p.sendMessage("§cFixed health of " + t.getName());
 			}
+
+			if (args[0].equalsIgnoreCase("karma")) {
+				String test = args[1];
+				p.sendMessage("§cKarma of " + test + " is " + KarmaManager.getKarma(test, true));
+			}
+
+			if (args[0].equalsIgnoreCase("curday")) {
+				p.sendMessage("§bToday's day is " + TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis()));
+			}
+
+			if (args[0].equalsIgnoreCase("timetill")) {
+				long tmrwDay = TimeUnit.DAYS.toMillis((TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis()) + 1));
+				long ttill = TimeUnit.MILLISECONDS.toSeconds(tmrwDay - System.currentTimeMillis());
+				String time = String.format("%d:%02d:%02d", ttill / 3600, (ttill / 60) % 60, (ttill % 60));
+				p.sendMessage("§bTime until reset: " + time);
+			}
 		}
 
 		return true;
 	}
-
 }
