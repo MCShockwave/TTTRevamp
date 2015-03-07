@@ -35,6 +35,7 @@ public class KarmaManager {
 			int k = getKarma(name, true);
 			if (k <= KARMA_LIMIT) {
 				p.kickPlayer("§cYour karma has gotten too low!");
+				KarmaManager.karmaBan(p.getName());
 			} else if (k < KARMA_LIMIT + 200) {
 				MCShockwave.send(ChatColor.RED, p, "Warning! You are %s karma away from being karma-banned!", k
 						- KARMA_LIMIT);
@@ -75,6 +76,25 @@ public class KarmaManager {
 			karmaChange.put(name, new KarmaChange());
 		}
 		karmaChange.get(name).add(am, r);
+	}
+
+	public static boolean isKarmaBanned(String name) {
+		return SQLTable.Karma.getInt("Username", name, "KarmaBanTime") > TimeUnit.MILLISECONDS.toMinutes(System
+				.currentTimeMillis());
+	}
+
+	public static void karmaBan(String name) {
+		long lenDays = SQLTable.Karma.getInt("Username", name, "LastBanLength") + 1;
+		long lenMin = TimeUnit.DAYS.toMinutes(lenDays);
+
+		long unbanTime = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis()) + lenMin;
+		SQLTable.Karma.set("KarmaBanTime", unbanTime + "", "Username", name);
+		SQLTable.Karma.set("LastBanLength", lenDays + "", "Username", name);
+
+		if (Bukkit.getPlayer(name) != null) {
+			Bukkit.getPlayer(name).kickPlayer(
+					"§cYou have been karma-banned for " + lenDays + " days for having karma under " + KARMA_LIMIT);
+		}
 	}
 
 	public static class KarmaChange {

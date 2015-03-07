@@ -279,7 +279,7 @@ public class GameManager {
 	}
 
 	public static void basicKit(Player p) {
-		PlayerUtils.clearInv(p);
+		PlayerUtils.clearInv(p, true);
 		p.getInventory().setItem(0, ItemMetaUtils.setItemName(new ItemStack(Material.IRON_SWORD), "§fCrowbar"));
 		p.getInventory().setItem(7, AmmoType.TTT_PRIMARY.getItem(20));
 		p.getInventory().setItem(8, AmmoType.TTT_SECONDARY.getItem(10));
@@ -302,7 +302,7 @@ public class GameManager {
 		ArrayList<Location> spawns = FileElements.getAll("player-spawn", GameWorlds.getGameWorld());
 
 		for (Player p : getPlayers()) {
-			PlayerUtils.resetPlayer(p);
+			PlayerUtils.resetPlayer(p, true);
 			p.teleport(spawns.get(rand.nextInt(spawns.size())).clone().add(0, 1, 0));
 			registerScoreboards();
 			basicKit(p);
@@ -494,7 +494,7 @@ public class GameManager {
 					}
 					p.teleport(GameWorlds.Lobby.w.getSpawnLocation());
 					p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
-					PlayerUtils.resetPlayer(p);
+					PlayerUtils.resetPlayer(p, true);
 
 					for (Player p2 : getPlayers()) {
 						p2.showPlayer(p);
@@ -533,7 +533,7 @@ public class GameManager {
 			specs.add(p.getName());
 		}
 
-		PlayerUtils.resetPlayer(p);
+		PlayerUtils.resetPlayer(p, false);
 		p.getInventory()
 				.setItem(8, ItemMetaUtils.setItemName(new ItemStack(Material.FEATHER), "§6Teleport to Players"));
 		p.getInventory().setItem(7, InfoBook.getBookItem());
@@ -639,7 +639,7 @@ public class GameManager {
 	}
 
 	public static void lobbyKit(Player p) {
-		PlayerUtils.clearInv(p);
+		PlayerUtils.clearInv(p, true);
 		p.getInventory().setItem(8, InfoBook.getBookItem());
 		p.getInventory().setItem(7, ItemMetaUtils.setItemName(new ItemStack(Material.DIAMOND), "§bClick for parkour"));
 		if (voting) {

@@ -3,11 +3,13 @@ package net.mcshockwave.ttt;
 import net.mcshockwave.Guns.Gun;
 import net.mcshockwave.Guns.descriptors.GunType;
 import net.mcshockwave.MCS.MCShockwave;
+import net.mcshockwave.MCS.SQLTable;
 import net.mcshockwave.MCS.Menu.ItemMenu;
 import net.mcshockwave.MCS.Menu.ItemMenu.Button;
 import net.mcshockwave.MCS.Menu.ItemMenu.ButtonRunnable;
 import net.mcshockwave.MCS.Utils.ItemMetaUtils;
 import net.mcshockwave.MCS.Utils.LocUtils;
+import net.mcshockwave.MCS.Utils.MiscUtils;
 import net.mcshockwave.MCS.Utils.PacketUtils;
 import net.mcshockwave.MCS.Utils.PacketUtils.ParticleEffect;
 import net.mcshockwave.ttt.CorpseManager.Corpse;
@@ -62,6 +64,7 @@ import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.hanging.HangingBreakEvent.RemoveCause;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType.SlotType;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerEggThrowEvent;
@@ -88,6 +91,7 @@ import org.bukkit.util.Vector;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 import java.util.Random;
 
 import org.apache.commons.lang.WordUtils;
@@ -102,6 +106,13 @@ public class DefaultListener implements Listener {
 			event.setResult(Result.KICK_BANNED);
 			event.setKickMessage("§cYour karma is too low! It will be reset within a day!");
 		}
+		if (KarmaManager.isKarmaBanned(p.getName())) {
+			long timeUnban = SQLTable.Karma.getInt("Username", p.getName(), "KarmaBanTime");
+			long minsUntil = timeUnban - TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis());
+			event.setResult(Result.KICK_BANNED);
+			event.setKickMessage("§cYou have been karma-banned for having too low karma! §b["
+					+ (MiscUtils.getRoundedNumber(minsUntil / 1440D, 1)) + " days left]");
+		}
 	}
 
 	@EventHandler
@@ -113,7 +124,7 @@ public class DefaultListener implements Listener {
 			GameManager.startCount();
 		}
 
-		PlayerUtils.resetPlayer(p);
+		PlayerUtils.resetPlayer(p, true);
 
 		p.teleport(getRespawnLocation(p));
 
@@ -551,6 +562,10 @@ public class DefaultListener implements Listener {
 				&& ChatColor.stripColor(ItemMetaUtils.getItemName(cu)).equalsIgnoreCase("Player List")) {
 			event.setCancelled(true);
 		}
+		if (event.getSlotType() == SlotType.ARMOR && cu != null && cu.getType() != Material.AIR && cu.hasItemMeta()
+				&& cu.getItemMeta().hasDisplayName() && cu.getItemMeta().getDisplayName().startsWith("§e")) {
+			event.setCancelled(true);
+		}
 	}
 
 	public void onQuit(Player p) {
@@ -748,6 +763,13 @@ public class DefaultListener implements Listener {
 				}
 			} else {
 				event.setCancelled(true);
+			}
+
+			int kar = KarmaManager.getKarma(d.getName(), false);
+			if (kar < 1000) {
+				double karmLim = KarmaManager.KARMA_LIMIT / 1.75;
+				double karmaPerc = (kar - karmLim) / (1000 - karmLim);
+				event.setDamage(event.getDamage() * karmaPerc);
 			}
 
 			if (GameManager.state == GameState.GAME && !event.isCancelled() && event.getDamage() >= 1) {
